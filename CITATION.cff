@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Alford"
+  given-names: "Jacob"
+  orcid: "https://orcid.org/0009-0006-6430-438X"
+title: "PlasmidViz"
+version: 0.1.0
+date-released: 2025-04-02
+url: "https://github.com/Syrinx55/PlasmidViz"
