@@ -1,6 +1,3 @@
-# Copyright (c) 2025 Jacob Alford <jalford0000@gmail.com>
-# SPDX-License-Identifier: BSD-2-Clause-Patent
-
 import os
 import re
 import csv
@@ -651,16 +648,28 @@ def extract_sorted_cds(genbank_path, output_dir):
         for record in SeqIO.parse(genbank_path, "genbank"):
             for feature in record.features:
                 if feature.type == "CDS":
+                    # Extract gene name
+                    gene_name = feature.qualifiers.get("gene", ["unknown_gene"])[0]
+
+                    # Extract start and stop positions
+                    start = (
+                        int(feature.location.start) + 1
+                    )  # Convert to 1-based indexing
+                    stop = int(feature.location.end)  # End is exclusive in Biopython
+
+                    # Extract the CDS sequence
                     cds_seq = feature.extract(record.seq)
+
+                    # Determine the strand and write to the appropriate file
                     if feature.location.strand == 1:
                         pos_f.write(
-                            f">{record.id}_{feature.qualifiers.get('locus_tag', ['unknown'])[0]}\n"
+                            f">{record.id}_{gene_name}_start{start}_stop{stop}\n"
                         )
                         pos_f.write(str(cds_seq) + "\n")
                     elif feature.location.strand == -1:
                         cds_seq = cds_seq.reverse_complement()
                         neg_f.write(
-                            f">{record.id}_{feature.qualifiers.get('locus_tag', ['unknown'])[0]}\n"
+                            f">{record.id}_{gene_name}_start{start}_stop{stop}\n"
                         )
                         neg_f.write(str(cds_seq) + "\n")
 
@@ -720,8 +729,14 @@ def run_mobileog_search(protein_file, db_path, output_file, config):
 
 
 def run_mobileogdb_genbank(genbank_path, output_dir, config):
-    # Step 1: Extract proteins from the GenBank file
+    """
+    Extract proteins from the GenBank file to include
+    nucleotide coordinates. Additionally, store the strand (1 for + and -1 for -)
+    in the CDS mapping for later integration with MobileOG results.
+    """
     protein_file = os.path.join(output_dir, "genbank_proteins.faa")
+    cds_mapping = {}  # Mapping: composite_id -> {start: int, stop: int, strand: int}
+
     with open(protein_file, "w") as out_f:
         for record in SeqIO.parse(genbank_path, "genbank"):
             for feat in record.features:
@@ -730,18 +745,81 @@ def run_mobileogdb_genbank(genbank_path, output_dir, config):
                 if "translation" not in feat.qualifiers:
                     continue
                 protein = feat.qualifiers["translation"][0]
-                locus_tag = feat.qualifiers.get("locus_tag", [""])[0]
+                locus_tag = feat.qualifiers.get("locus_tag", ["unknown"])[0]
                 product = feat.qualifiers.get("product", ["unknown"])[0]
-                header = f">{locus_tag}|{product}"
+                start = int(feat.location.start) + 1  # 1-based indexing
+                stop = int(feat.location.end)  # end position as given
+                strand = feat.location.strand  # typically 1 or -1
+                # Create a composite id without strand (since it can be stored separately)
+                composite_id = f"{record.id}_{locus_tag}_start{start}_stop{stop}"
+                header = f">{composite_id}|{product}"
                 out_f.write(f"{header}\n{protein}\n")
-    print(f"[INFO] Extracted proteins written to {protein_file}")
+                # Store the coordinates and strand in the mapping dictionary
+                cds_mapping[composite_id] = {
+                    "start": start,
+                    "stop": stop,
+                    "strand": strand,
+                }
 
-    # Step 2: Build (or verify) the MobileOG Diamond database
+    print(
+        f"[INFO] Extracted proteins with CDS coordinates and strand info to {protein_file}"
+    )
+
+    # Build (or verify) the MobileOG Diamond database and run the search.
     db_path = build_mobileog_db(output_dir, config)
-
-    # Step 3: Run Diamond search against the built MobileOG database
     diamond_out = os.path.join(output_dir, "mobileOG_results.tsv")
     run_mobileog_search(protein_file, db_path, diamond_out, config)
+
+    # Return both the Diamond results path and the CDS mapping (with strand info).
+    return diamond_out, cds_mapping
+
+
+def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_file):
+    # Integrates the MobileOG Diamond output with CDS nucleotide coordinates and strand info.
+    # Read the MobileOG Diamond results.
+    # Diamond outfmt 6 output columns:
+    # qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore
+    df = pd.read_csv(mobileog_results_tsv, sep="\t", header=None)
+    df.columns = [
+        "qseqid",
+        "sseqid",
+        "pident",
+        "length",
+        "mismatch",
+        "gapopen",
+        "qstart",
+        "qend",
+        "sstart",
+        "send",
+        "evalue",
+        "bitscore",
+    ]
+
+    # The query header (qseqid) is in the form: composite_id|product
+    # Extract the composite_id by splitting on the pipe.
+    df["composite_id"] = df["qseqid"].apply(lambda x: x.split("|")[0])
+
+    # Map nucleotide coordinates and strand from the cds_mapping dictionary.
+    df["nuc_start"] = df["composite_id"].apply(
+        lambda x: cds_mapping.get(x, {}).get("start")
+    )
+    df["nuc_stop"] = df["composite_id"].apply(
+        lambda x: cds_mapping.get(x, {}).get("stop")
+    )
+    # Convert strand 1 and -1 to human-readable '+' and '-' if desired.
+    df["strand"] = df["composite_id"].apply(
+        lambda x: (
+            "+"
+            if cds_mapping.get(x, {}).get("strand") == 1
+            else "-" if cds_mapping.get(x, {}).get("strand") == -1 else None
+        )
+    )
+
+    # Save the integrated results to a TSV file.
+    df.to_csv(output_file, sep="\t", index=False)
+    print(
+        f"[INFO] Integrated MobileOG annotations (with CDS positions and strand) saved to {output_file}"
+    )
 
 
 def analyze_plasmid_features(genbank_path, mobileog_tsv, output_dir):
@@ -773,7 +851,6 @@ def setup_directories(accession, config):
         "isescan": os.path.join(base_dir, "isescan"),
         "plsdb": os.path.join(base_dir, "plsdb"),
         "ectyper": os.path.join(base_dir, "ectyper"),
-        "ectyper_assemblies": os.path.join(base_dir, "ectyper_assemblies"),
         "mobileogdb": os.path.join(base_dir, "mobileogdb"),
         "assembly_fastas": os.path.join(base_dir, "assembly_fastas"),
     }
@@ -830,8 +907,16 @@ def process_accession(accession, config):
         print(f"[{accession}] Extracting and sorting CDS features...")
         extract_sorted_cds(genbank_path, dirs["cds"])
 
-        print(f"[{accession}] Running mobileOG-db analysis...")
-        run_mobileogdb_genbank(genbank_path, dirs["mobileogdb"], config)
+        print(
+            f"[{accession}] Running mobileOG-db analysis with CDS coordinate enrichment..."
+        )
+        mobileog_results_tsv, cds_mapping = run_mobileogdb_genbank(
+            genbank_path, dirs["mobileogdb"], config
+        )
+        integrated_output = os.path.join(dirs["mobileogdb"], "mobileOG_integrated.tsv")
+        integrate_mobileog_annotations(
+            mobileog_results_tsv, cds_mapping, integrated_output
+        )
 
         print(f"[{accession}] Extracting and sorting CDS features again...")
 
