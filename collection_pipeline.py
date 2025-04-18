@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Jacob Alford <jalford0000@gmail.com>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+
 import os
 import re
 import csv
@@ -48,7 +51,6 @@ def load_config():
         "diamond_path",
         "mobileog_db_faa",
         "mobileog_db_csv",
-        # New lines: needed for the two-step merging
         "nuccore_csv",  # Must point to 'nuccore.csv' with columns [NUCCORE_ACC, ASSEMBLY_UID]
         "assembly_csv",  # Must point to 'assembly.csv' with columns [ASSEMBLY_UID, ASSEMBLY_ACC]
         "plsdb_sketch_path",  # The local .msh file for MASH
@@ -187,6 +189,7 @@ def run_abricate(fasta_path, output_dir, config):
         "card",
         "argannot",
         "resfinder",
+        "Ecoli_VF",
     ]  # Can be adjusted to add/omit certain dbs from search
 
     for db in dbs:
@@ -774,8 +777,217 @@ def run_mobileogdb_genbank(genbank_path, output_dir, config):
     return diamond_out, cds_mapping
 
 
+def run_phastest_search(fasta_path, db_path, output_file, config):
+    cmd = [
+        config["diamond_path"],
+        "blastp",
+        "--query",
+        fasta_path,
+        "--db",
+        db_path,
+        "--id",
+        "90",
+        "--query-cover",
+        "90",
+        "--out",
+        output_file,
+        "--outfmt",
+        "6",
+        "--evalue",
+        "1e-5",
+        "--max-target-seqs",
+        "1",
+        "--threads",
+        str(config.get("max_workers", "2")),
+    ]
+    subprocess.run(cmd, check=True)
+    print(f"[SUCCESS] PHASTEST search complete. Results saved to {output_file}")
+
+
+def run_phastest_region_search(fasta_path, output_dir, output_file, config):
+    """
+    Processes the results of a DIAMOND phage search and attempts to map hits
+    to nucleotide coordinates using CDS features in the GenBank file.
+    """
+    # Derive accession from FASTA filename
+    accession = os.path.splitext(os.path.basename(fasta_path))[0]
+    genbank_path = os.path.join(
+        output_dir.replace("/phastest", "/ncbi"), f"{accession}.gbk"
+    )
+    diamond_out = os.path.join(output_dir, f"{accession}_phastest.tsv")
+
+    # Load GenBank features into CDS coordinate map
+    cds_map = {}
+    for record in SeqIO.parse(genbank_path, "genbank"):
+        for feature in record.features:
+            if feature.type == "CDS" and "translation" in feature.qualifiers:
+                start = int(feature.location.start) + 1
+                end = int(feature.location.end)
+                strand = feature.location.strand
+                protein_seq = feature.qualifiers["translation"][0]
+                cds_map[protein_seq] = {
+                    "start": start,
+                    "end": end,
+                    "strand": strand,
+                }
+
+    # Process DIAMOND hits
+    if not os.path.exists(diamond_out):
+        print(f"[WARNING] PHASTEST results not found: {diamond_out}")
+        return
+
+    hits = pd.read_csv(diamond_out, sep="\t", header=None)
+    hits.columns = [
+        "qseqid",
+        "sseqid",
+        "pident",
+        "length",
+        "mismatch",
+        "gapopen",
+        "qstart",
+        "qend",
+        "sstart",
+        "send",
+        "evalue",
+        "bitscore",
+    ]
+
+    phage_hits = []
+    for _, row in hits.iterrows():
+        hit_protein = row["sseqid"]
+        sstart = row["sstart"]
+        send = row["send"]
+
+        protein_seq = None
+        for k in cds_map:
+            if hit_protein in k:
+                protein_seq = k
+                break
+
+        if protein_seq and protein_seq in cds_map:
+            cds = cds_map[protein_seq]
+            if cds["strand"] == 1:
+                nuc_start = cds["start"] + (min(sstart, send) - 1) * 3
+                nuc_end = cds["start"] + (max(sstart, send) - 1) * 3
+            else:
+                nuc_end = cds["end"] - (min(sstart, send) - 1) * 3
+                nuc_start = cds["end"] - (max(sstart, send) - 1) * 3
+            phage_hits.append((nuc_start, nuc_end, hit_protein))
+
+    # Write results
+    with open(output_file, "w") as f:
+        f.write("region_start\tregion_end\tphage_hit\n")
+        for start, end, name in phage_hits:
+            f.write(f"{start}\t{end}\t{name}\n")
+
+    print(f"[SUCCESS] PHASTEST phage region output written to {output_file}")
+
+
+def summarize_phage_regions(
+    phage_hits_tsv, genbank_path, summary_output_tsv, min_cluster_distance=10000
+):
+    import numpy as np
+    from collections import Counter
+    import os
+    from Bio import SeqIO
+    import pandas as pd
+
+    if not os.path.exists(phage_hits_tsv):
+        print(
+            f"[WARNING] Cannot summarize PHASTEST results: missing file {phage_hits_tsv}"
+        )
+        return
+
+    # Read hits and sort by start position
+    hits = pd.read_csv(phage_hits_tsv, sep="\t")
+    hits = hits.sort_values("region_start")
+
+    # Group into regions by distance threshold
+    regions = []
+    current_region = []
+    last_end = -1
+
+    for _, row in hits.iterrows():
+        start, end = row["region_start"], row["region_end"]
+        if last_end == -1 or start - last_end <= min_cluster_distance:
+            current_region.append(row)
+        else:
+            if current_region:
+                regions.append(pd.DataFrame(current_region))
+            current_region = [row]
+        last_end = end
+
+    if current_region:
+        regions.append(pd.DataFrame(current_region))
+
+    # Parse GenBank for GC%
+    gc_cache = {}
+    for record in SeqIO.parse(genbank_path, "genbank"):
+        seq = record.seq
+        for i, region_df in enumerate(regions, start=1):
+            start = region_df["region_start"].min()
+            end = region_df["region_end"].max()
+            region_seq = seq[start - 1 : end]
+            gc = (
+                100
+                * float(region_seq.count("G") + region_seq.count("C"))
+                / len(region_seq)
+            )
+            gc_cache[i] = round(gc, 2)
+
+    # Score and completeness heuristics
+    summary_rows = []
+    for i, region_df in enumerate(regions, start=1):
+        start = region_df["region_start"].min()
+        end = region_df["region_end"].max()
+        length_kb = round((end - start + 1) / 1000, 1)
+        proteins = len(region_df)
+        score = min(150, proteins * 2 + 10)  # heuristic
+        if score >= 90:
+            completeness = "intact"
+        elif score >= 70:
+            completeness = "questionable"
+        else:
+            completeness = "incomplete"
+        from collections import Counter
+
+        most_common_phage = Counter(region_df["phage_hit"]).most_common(1)[0][0]
+        gc = gc_cache.get(i, "NA")
+        summary_rows.append(
+            [
+                i,
+                f"{length_kb}Kb",
+                completeness,
+                score,
+                proteins,
+                f"{start}-{end}",
+                most_common_phage,
+                gc,
+            ]
+        )
+
+    summary_df = pd.DataFrame(
+        summary_rows,
+        columns=[
+            "Region",
+            "Region Length",
+            "Completeness",
+            "Score",
+            "# Total Proteins",
+            "Region Position",
+            "Most Common Phage",
+            "GC %",
+        ],
+    )
+    summary_df.to_csv(summary_output_tsv, sep="\t", index=False)
+    print(f"[SUCCESS] PHASTEST summary output written to {summary_output_tsv}")
+
+
 def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_file):
-    # Integrates the MobileOG Diamond output with CDS nucleotide coordinates and strand info.
+    """
+    Integrates the MobileOG Diamond output with CDS nucleotide coordinates and strand info.
+    Extract the composite identifier and join with the CDS mapping.
+    """
     # Read the MobileOG Diamond results.
     # Diamond outfmt 6 output columns:
     # qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore
@@ -838,8 +1050,8 @@ def analyze_plasmid_features(genbank_path, mobileog_tsv, output_dir):
     plasmid_genes.to_csv(os.path.join(output_dir, "plasmid_associated_genes.tsv"))
 
 
-def setup_directories(accession, config):
-    base_dir = os.path.join(config["output_base"], accession)
+def setup_directories(accession, config, output_override=None):
+    base_dir = output_override or os.path.join(config["output_base"], accession)
     dirs = {
         "base": base_dir,
         "cds": os.path.join(base_dir, "CDS"),
@@ -853,35 +1065,93 @@ def setup_directories(accession, config):
         "ectyper": os.path.join(base_dir, "ectyper"),
         "mobileogdb": os.path.join(base_dir, "mobileogdb"),
         "assembly_fastas": os.path.join(base_dir, "assembly_fastas"),
+        "phastest": os.path.join(base_dir, "phastest"),
     }
     for d in dirs.values():
         os.makedirs(d, exist_ok=True)
     return dirs
 
 
-# Main pipeline function
-def process_accession(accession, config):
-    start_time = datetime.now()
-    dirs = setup_directories(accession, config)
+def extract_accession_from_file(file_path):
+    # Parse the accession from a local FASTA or GenBank file.
+    try:
+        with open(file_path) as handle:
+            record = next(
+                SeqIO.parse(
+                    handle, "fasta" if file_path.endswith(".fasta") else "genbank"
+                )
+            )
+            return record.id.split()[0]
+    except Exception as e:
+        print(f"[ERROR] Could not extract accession from {file_path}: {e}")
+        return None
 
-    # 1. Fetch data from NCBI
-    fasta, genbank = fetch_ncbi_data(accession, config)
-    if not fasta or not genbank:
-        return False
+
+# Main pipeline function
+def process_accession(
+    accession,
+    config,
+    included_tools=None,
+    debug_textbox=None,
+    fasta_override=None,
+    genbank_override=None,
+    output_override=None,
+    timestamp_output=False,
+):
+    def log(msg):
+        if debug_textbox:
+            debug_textbox.insert("end", msg + "\n")
+            debug_textbox.see("end")
+        else:
+            print(msg)
+
+    start_time = datetime.now()
+
+    if timestamp_output and not output_override:
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        output_override = os.path.join(
+            config["output_base"], f"{accession}_{timestamp}"
+        )
+
+    # Use output_override in setup
+    dirs = setup_directories(accession, config, output_override=output_override)
 
     fasta_path = os.path.join(dirs["ncbi"], f"{accession}.fasta")
     genbank_path = os.path.join(dirs["ncbi"], f"{accession}.gbk")
+
+    # FASTA fallback handling
+    if fasta_override and os.path.exists(fasta_override):
+        log(f"[INFO] Using uploaded FASTA file: {fasta_override}")
+        with open(fasta_override) as f:
+            fasta = f.read()
+    else:
+        fasta, _ = fetch_ncbi_data(accession, config)
+        if not fasta:
+            log(f"[ERROR] Could not fetch FASTA for {accession}")
+            return False
+
     with open(fasta_path, "w") as f:
         f.write(fasta)
+
+    # GenBank fallback handling
+    if genbank_override and os.path.exists(genbank_override):
+        log(f"[INFO] Using uploaded GenBank file: {genbank_override}")
+        with open(genbank_override) as f:
+            genbank = f.read()
+    else:
+        _, genbank = fetch_ncbi_data(accession, config)
+        if not genbank:
+            log(f"[ERROR] Could not fetch GenBank for {accession}")
+            return False
+
     with open(genbank_path, "w") as f:
         f.write(genbank)
 
     try:
-        print(f"[{accession}] Running BLASTn against tncentral")
+        log(f"[{accession}] Running BLASTn against tncentral")
         tncentral_fasta = config.get("tncentral_fasta")
         tncentral_db = config.get("tncentral_db")
 
-        # Ensure the BLAST database exists:
         ensure_blastdb_exists(tncentral_fasta, tncentral_db)
 
         blast_output = os.path.join(
@@ -895,175 +1165,172 @@ def process_accession(accession, config):
             num_threads=int(config["max_workers"]),
         )
 
-        print(f"[{accession}] Running Abricate...")
-        run_abricate(fasta_path, dirs["abricate"], config)
+        if not included_tools or "abricate" in included_tools:
+            log(f"[{accession}] Running Abricate...")
+            run_abricate(fasta_path, dirs["abricate"], config)
 
-        print(f"[{accession}] Running ISEScan...")
-        try:
-            run_isescan(fasta_path, dirs["isescan"], config)
-        except Exception as e:
-            print(f"[{accession}] ISEScan failed, continuing: {e}")
+        if not included_tools or "isescan" in included_tools:
+            log(f"[{accession}] Running ISEScan...")
+            try:
+                run_isescan(fasta_path, dirs["isescan"], config)
+            except Exception as e:
+                log(f"[{accession}] ISEScan failed, continuing: {e}")
 
-        print(f"[{accession}] Extracting and sorting CDS features...")
+        log(f"[{accession}] Extracting and sorting CDS features...")
         extract_sorted_cds(genbank_path, dirs["cds"])
 
-        print(
-            f"[{accession}] Running mobileOG-db analysis with CDS coordinate enrichment..."
-        )
-        mobileog_results_tsv, cds_mapping = run_mobileogdb_genbank(
-            genbank_path, dirs["mobileogdb"], config
-        )
-        integrated_output = os.path.join(dirs["mobileogdb"], "mobileOG_integrated.tsv")
-        integrate_mobileog_annotations(
-            mobileog_results_tsv, cds_mapping, integrated_output
-        )
-
-        print(f"[{accession}] Extracting and sorting CDS features again...")
-
-        print(f"[{accession}] Running Integron Finder...")
-        run_integron_finder(fasta_path, dirs["integron"], config)
-
-        print(f"[{accession}] Running local Mash screen for PLSDB hits...")
-        mash_sketch = config["plsdb_sketch_path"]
-        mash_output = os.path.join(dirs["plsdb"], f"{accession}_mash.tsv")
-        run_mash_screen_query(
-            query_fasta=fasta_path,
-            mash_sketch_path=mash_sketch,
-            output_tsv=mash_output,
-            max_pvalue=0.1,
-            min_ident=0.99,
-            threads=int(config["max_workers"]),
-            winner_takes_all=False,
-        )
-
-        # Check if the Mash table is empty
-        if is_mash_table_empty(mash_output):
-            print(
-                f"[{accession}] Mash table is empty. Skipping PLSDB-dependent steps (assemblies download, plasmid accessions, and ectyper on extracted assemblies)."
+        if not included_tools or "mobileog" in included_tools:
+            log(
+                f"[{accession}] Running mobileOG-db analysis with CDS coordinate enrichment..."
             )
-        else:
-            # Continue with PLSDB-dependent steps:
-            mash_asm_output = os.path.join(
-                dirs["plsdb"], f"{accession}_mash_with_assembly.tsv"
+            mobileog_results_tsv, cds_mapping = run_mobileogdb_genbank(
+                genbank_path, dirs["mobileogdb"], config
             )
-            add_assembly_acc_two_step(
-                mash_output_tsv=mash_output,
-                nuccore_csv=config["nuccore_csv"],
-                assembly_csv=config["assembly_csv"],
-                out_tsv=mash_asm_output,
+            integrated_output = os.path.join(
+                dirs["mobileogdb"], "mobileOG_integrated.tsv"
             )
-            print(f"[{accession}] Using MASH output file: {mash_asm_output}")
-
-            print(f"[{accession}] Downloading related plasmids: {mash_asm_output}")
-            email = config["entrez_email"]
-            download_plasmid_accessions(mash_output, dirs["plsdb"], email)
-
-            print(f"[{accession}] Downloading assemblies using NCBI Datasets CLI...")
-            download_assemblies(mash_asm_output, dirs["assembly_fastas"])
-
-            print(f"[{accession}] Extracting FASTA files...")
-            fasta_files = extract_assemblies(dirs["assembly_fastas"])
-
-            print(f"[{accession}] Running eCTyper on extracted assemblies...")
-            combined_ectyper_results_file = os.path.join(
-                dirs["ectyper"], "ectyper_results_combined.tsv"
-            )
-            run_ectyper_on_assemblies(
-                fasta_files, dirs["ectyper"], config, combined_ectyper_results_file
+            integrate_mobileog_annotations(
+                mobileog_results_tsv, cds_mapping, integrated_output
             )
 
-            if not os.path.exists(combined_ectyper_results_file):
-                print(
-                    f"[ERROR] Combined eCTyper results file was not created: {combined_ectyper_results_file}"
+        if not included_tools or "integron finder" in included_tools:
+            log(f"[{accession}] Running Integron Finder...")
+            run_integron_finder(fasta_path, dirs["integron"], config)
+
+        if not included_tools or "plsdb" in included_tools:
+            log(f"[{accession}] Running local Mash screen for PLSDB hits...")
+            mash_sketch = config["plsdb_sketch_path"]
+            mash_output = os.path.join(dirs["plsdb"], f"{accession}_mash.tsv")
+            run_mash_screen_query(
+                query_fasta=fasta_path,
+                mash_sketch_path=mash_sketch,
+                output_tsv=mash_output,
+                max_pvalue=0.1,
+                min_ident=0.99,
+                threads=int(config["max_workers"]),
+                winner_takes_all=False,
+            )
+
+            if not is_mash_table_empty(mash_output):
+                mash_asm_output = os.path.join(
+                    dirs["plsdb"], f"{accession}_mash_with_assembly.tsv"
+                )
+                add_assembly_acc_two_step(
+                    mash_output_tsv=mash_output,
+                    nuccore_csv=config["nuccore_csv"],
+                    assembly_csv=config["assembly_csv"],
+                    out_tsv=mash_asm_output,
+                )
+                log(f"[{accession}] Using MASH output file: {mash_asm_output}")
+
+                email = config["entrez_email"]
+                download_plasmid_accessions(mash_output, dirs["plsdb"], email)
+
+                log(f"[{accession}] Downloading assemblies using NCBI Datasets CLI...")
+                download_assemblies(mash_asm_output, dirs["assembly_fastas"])
+
+                fasta_files = extract_assemblies(dirs["assembly_fastas"])
+                log(f"[{accession}] Running eCTyper on extracted assemblies...")
+                combined_ectyper_results_file = os.path.join(
+                    dirs["ectyper"], "ectyper_results_combined.tsv"
+                )
+                run_ectyper_on_assemblies(
+                    fasta_files, dirs["ectyper"], config, combined_ectyper_results_file
                 )
 
-            print(f"[{accession}] Mapping serotypes to MASH output...")
-            ectyper_results_file = os.path.join(
-                dirs["ectyper"], "ectyper_results_combined.tsv"
-            )
-            serotype_mapping_file = os.path.join(
-                dirs["ectyper"], "ectyper_serotypes.tsv"
-            )
-            create_serotype_mapping(
-                mash_asm_output, ectyper_results_file, serotype_mapping_file
-            )
+                if os.path.exists(combined_ectyper_results_file):
+                    ectyper_results_file = os.path.join(
+                        dirs["ectyper"], "ectyper_results_combined.tsv"
+                    )
+                    serotype_mapping_file = os.path.join(
+                        dirs["ectyper"], "ectyper_serotypes.tsv"
+                    )
+                    create_serotype_mapping(
+                        mash_asm_output, ectyper_results_file, serotype_mapping_file
+                    )
+                else:
+                    log(
+                        f"[ERROR] Combined eCTyper results file was not created: {combined_ectyper_results_file}"
+                    )
 
-            print(f"[{accession}] Running ectyper on the original accession...")
+        if not included_tools or "ectyper" in included_tools:
+            log(f"[{accession}] Running ectyper on the original accession...")
             run_ectyper(accession, dirs["ectyper"], config)
 
-            print(f"[{accession}] Submitting genome to IslandViewer HTTP API...")
-        response_data = submit_islandviewer_job(genbank_path, config)
-        print(f"[{accession}] IslandViewer submission response: {response_data}")
-        token = response_data.get("token")
-        if not token:
-            raise ValueError("No token returned from IslandViewer submission.")
+        if not included_tools or "phastest" in included_tools:
+            log(f"[{accession}] Running phage region search via PHASTEST local db...")
+            phastest_faa = config["phastest_db"]
+            phastest_db = os.path.join(dirs["phastest"], "phastest_db")
+            phastest_out = os.path.join(dirs["phastest"], f"{accession}_phastest.tsv")
 
-        # Poll job for the download URL
-        download_url = poll_islandviewer_job(
-            token, config, sleep_interval=int(config.get("sleep_interval", "10"))
-        )
-        print(f"[{accession}] Download URL obtained: {download_url}")
+            if not os.path.exists(phastest_db + ".dmnd"):
+                log("[INFO] Creating PHASTEST DIAMOND database...")
+                subprocess.run(
+                    [
+                        config["diamond_path"],
+                        "makedb",
+                        "--in",
+                        phastest_faa,
+                        "-d",
+                        phastest_db,
+                    ],
+                    check=True,
+                )
+                log("[SUCCESS] PHASTEST database created.")
 
-        # Download the results and assign to islandviewer_tsv
-        islandviewer_tsv = download_islandviewer_results(
-            download_url, dirs["islandviewer"], accession, config
+            phastest_protein_file = os.path.join(
+                dirs["phastest"], f"{accession}_proteins.faa"
+            )
+            with open(genbank_path) as handle, open(
+                phastest_protein_file, "w"
+            ) as out_f:
+                for record in SeqIO.parse(handle, "genbank"):
+                    for feat in record.features:
+                        if feat.type == "CDS" and "translation" in feat.qualifiers:
+                            protein = feat.qualifiers["translation"][0]
+                            locus_tag = feat.qualifiers.get("locus_tag", ["unknown"])[0]
+                            product = feat.qualifiers.get("product", ["unknown"])[0]
+                            out_f.write(f">{locus_tag}|{product}\n{protein}\n")
+
+            run_phastest_search(
+                phastest_protein_file, phastest_db, phastest_out, config
+            )
+
+        if not included_tools or "phastest" in included_tools:
+            log(f"[{accession}] Running PHASTEST-style phage region search...")
+            phastest_outfile = os.path.join(
+                dirs["phastest"], f"{accession}_phage_hits.tsv"
+            )
+        run_phastest_region_search(
+            fasta_path, dirs["phastest"], phastest_outfile, config
         )
-        print(f"[{accession}] IslandViewer TSV available at {islandviewer_tsv}")
+        phastest_summary_file = os.path.join(
+            dirs["phastest"], f"{accession}_phastest_summary.tsv"
+        )
+        summarize_phage_regions(phastest_outfile, genbank_path, phastest_summary_file)
+
+        if not included_tools or "islandviewer" in included_tools:
+            log(f"[{accession}] Submitting genome to IslandViewer HTTP API...")
+            response_data = submit_islandviewer_job(genbank_path, config)
+            log(f"[{accession}] IslandViewer submission response: {response_data}")
+            token = response_data.get("token")
+            if not token:
+                raise ValueError("No token returned from IslandViewer submission.")
+
+            download_url = poll_islandviewer_job(
+                token, config, sleep_interval=int(config.get("sleep_interval", "10"))
+            )
+            log(f"[{accession}] Download URL obtained: {download_url}")
+
+            islandviewer_tsv = download_islandviewer_results(
+                download_url, dirs["islandviewer"], accession, config
+            )
+            log(f"[{accession}] IslandViewer TSV available at {islandviewer_tsv}")
 
     except Exception as e:
-        print(f"[{accession}] Pipeline failed: {str(e)}")
+        log(f"[{accession}] Pipeline failed: {str(e)}")
         return False
 
     duration = datetime.now() - start_time
-    print(f"[{accession}] Completed in {duration}")
+    log(f"[{accession}] Completed in {duration}")
     return True
-
-
-def main():
-    try:
-        config = load_config()
-        validate_environment(config)
-        Entrez.email = config["entrez_email"]
-
-        parser = argparse.ArgumentParser(description="BRIG Automation Pipeline")
-        parser.add_argument("accessions", nargs="+", help="NCBI accession numbers")
-        parser.add_argument(
-            "--workers",
-            type=int,
-            default=int(config["max_workers"]),
-            help="Number of parallel workers",
-        )
-        args = parser.parse_args()
-
-        print(
-            f"Processing {len(args.accessions)} accessions with {args.workers} workers"
-        )
-
-        with ThreadPoolExecutor(max_workers=args.workers) as executor:
-            futures = {
-                executor.submit(process_accession, acc, config): acc
-                for acc in args.accessions
-            }
-            success_count = 0
-            for future in as_completed(futures):
-                acc = futures[future]
-                try:
-                    if future.result():
-                        success_count += 1
-                        print(f"[{acc}] Successfully processed")
-                    else:
-                        print(f"[{acc}] Failed processing")
-                except Exception as e:
-                    print(f"[{acc}] Critical error: {str(e)}")
-
-        print(
-            f"\nProcessing complete: {success_count}/{len(args.accessions)} succeeded"
-        )
-
-    except Exception as e:
-        print(f"Fatal error: {str(e)}")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

@@ -1,8 +1,8 @@
-# PlasmidViz
+# GenomeProfiler
 
 **W.I.P.**
 
-PlasmidViz description.
+Welcome to GenomeProfiler! GenomeProfiler is a pipeline for the profiling of prokaryotes and plasmids, including gene annotation across a wide range of features. GenomeProfiler provides features and nucleotide coordinates of metadata features for easy use in visual profiling and other analyses. Current features include antibiotic resistance genes, virulence genes, mobile genetic elements, finding related plasmids (for plasmid input), and more!
 
 ## Database Dependencies
 

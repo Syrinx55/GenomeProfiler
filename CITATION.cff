@@ -4,7 +4,7 @@ authors:
 - family-names: "Alford"
   given-names: "Jacob"
   orcid: "https://orcid.org/0009-0006-6430-438X"
-title: "PlasmidViz"
-version: 0.1.0
-date-released: 2025-04-02
-url: "https://github.com/Syrinx55/PlasmidViz"
+title: "GenomeProfiler"
+version: 0.3.0
+date-released: 2025-04-17
+url: "https://github.com/Syrinx55/GenomeProfiler"
