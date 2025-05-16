@@ -3,17 +3,20 @@
 
 import os
 import sys
-import threading
 from datetime import datetime
+from dotenv import load_dotenv
 from Bio import Entrez, SeqIO
 from configparser import ConfigParser
 from collection_pipeline import process_accession, validate_environment
-from cli_interface import parse_cli_args, generate_output_dir
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
-from cli_interface import log_progress
+from pathlib import Path
+from cli_interface import (
+    parse_args_from_cli,
+    generate_output_dir,
+)
 
-CONFIG_FILE = "config_plasmidviz.ini"
+CONFIG_FILE = "config_genomeprofiler.ini"
 SECTION = "brig_settings"
 
 
@@ -68,7 +71,6 @@ def load_config():
         raise KeyError(f"Missing section: {SECTION}")
 
     required_keys = [
-        "entrez_email",
         "output_base",
         "max_workers",
         "sleep_interval",
@@ -77,7 +79,6 @@ def load_config():
         "isescan_path",
         "ectyper_path",
         "islandviewer_api_submit",
-        "islandviewer_auth_token",
         "prodigal_path",
         "diamond_path",
         "mobileog_db_faa",
@@ -103,6 +104,8 @@ def load_config():
     return config[SECTION]
 
 
+# FIXME declaration shadows import (this declaration uses a name that already
+# exists in an import statement)
 def generate_output_dir(base, acc):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(base, f"{acc}_{timestamp}")
@@ -147,25 +150,17 @@ def launch_with_logging(acc, config, args, output_dir, timestamped):
         return process.returncode == 0
 
 
-def log_message(tool, message):
-    color = RAINBOW_COLORS.get(tool, None)
-    if color:
-        tqdm.write(colored(f"[{tool.upper()}] {message}", color))
-    else:
-        tqdm.write(f"[{tool.upper()}] {message}")
-
-
 def main():
     if "--accession" in sys.argv:
         import argparse
 
         parser = argparse.ArgumentParser()
-        parser.add_argument("--accession", required=True)
+        parser.add_argument("--accession", required=False)
         parser.add_argument("--output-dir")
         parser.add_argument(
             "--include-tools",
             nargs="*",
-            help="Tools to include: abricate, isescan, mobileog, ectyper, tncentral, integron, islandviewer, plsdb, phastest",
+            help="Tools to include: abricate, isescan, mobileog, ectyper, tncentral, integron, islandviewer, plsdb, phastest, parser",
         )
         parser.add_argument("--fasta")
         parser.add_argument("--genbank")
@@ -175,17 +170,24 @@ def main():
             help="Enable timestamped output directories",
         )
         args = parser.parse_args()
+        if not (args.accession or args.fasta or args.genbank):
+            print(
+                "[ERROR] You must provide either an accession or a local FASTA/GenBank file."
+            )
+            sys.exit(1)
 
         config = load_config()
+        load_dotenv()
         validate_environment(config)
-        Entrez.email = config["entrez_email"]
+        Entrez.email = os.environ["GENPROF_ENTREZ_EMAIL"]
         acc_out = (
             generate_output_dir(config["output_base"], args.accession)
             if args.timestamped_output
             else os.path.join(config["output_base"], args.accession)
         )
+        accession_to_use = args.accession if args.accession else "manual"
         process_accession(
-            accession=args.accession,
+            accession=accession_to_use,
             config=config,
             included_tools=args.include_tools,
             debug_textbox=None,
@@ -193,80 +195,40 @@ def main():
             genbank_override=args.genbank,
             output_override=acc_out,
         )
+        if "parser" in (args.include_tools or []):
+            from data_parser import run_parser
+
+            run_parser(Path(acc_out))
         return
+        
+    config = load_config()
+    validate_environment(config)
+    Entrez.email = os.environ["GENPROF_ENTREZ_EMAIL"]
 
-    try:
-        config = load_config()
-        validate_environment(config)
-        Entrez.email = config["entrez_email"]
+    args = parse_args_from_cli()
+    output_base = args.output_dir or config["output_base"]
 
-        args = parse_cli_args()
-        output_base = args.output_dir or config["output_base"]
+    print(
+        f"\n[GenomeProfiler CLI] Starting analysis with tools: {args.include_tools}"
+    )
+    print(f"[INFO] Using {args.workers} worker(s)")
+    print(f"[INFO] Output base directory: {output_base}\n")
+    if args.include_tools and "phastest" in args.include_tools:
+        print("[INFO] Phastest tool is enabled via --include-tools")
 
-        print(
-            f"\n[GenomeProfiler CLI] Starting analysis with tools: {args.include_tools}"
-        )
-        print(f"[INFO] Using {args.workers} worker(s)")
-        print(f"[INFO] Output base directory: {output_base}\n")
-        if args.include_tools and "phastest" in args.include_tools:
-            print("[INFO] Phastest tool is enabled via --include-tools")
+    accessions = args.accessions
+    futures = []
+    future_map = {}
 
-        accessions = args.accessions
-        futures = []
-        future_map = {}
-
-        with ThreadPoolExecutor(max_workers=args.workers) as executor:
-            for acc in accessions:
-                acc_out = (
-                    generate_output_dir(output_base, acc)
-                    if args.timestamped_output
-                    else os.path.join(output_base, acc)
-                )
-                tqdm.write(f"[INFO] Queued: {acc} → {acc_out}")
-                future = executor.submit(
-                    launch_with_logging,
-                    acc,
-                    config,
-                    args,
-                    acc_out,
-                    args.timestamped_output,
-                )
-                futures.append(future)
-                future_map[future] = acc
-
-            pbar = tqdm(total=len(futures), desc="Processing", ncols=100, leave=True)
-
-            def track_progress(future, acc, pbar):
-                try:
-                    result = future.result()
-                    if result:
-                        tqdm.write(
-                            colored(
-                                f"[{acc}] Successfully processed",
-                                RAINBOW_COLORS.get("abricate", "green"),
-                            )
-                        )
-                    else:
-                        tqdm.write(colored(f"[{acc}] Failed processing", "red"))
-                except Exception as e:
-                    tqdm.write(colored(f"[{acc}] Exception: {e}", "red"))
-                pbar.update(1)
-
-            threads = []
-            for future in futures:
-                acc = future_map[future]
-                t = threading.Thread(target=track_progress, args=(future, acc, pbar))
-                threads.append(t)
-                t.start()
-
-            for t in threads:
-                t.join()
-
-        print("\n[GenomeProfiler CLI] All processing complete.\n")
-
-    except Exception as e:
-        print(f"Fatal error: {str(e)}")
-        sys.exit(1)
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        for acc in accessions:
+            acc_out = (
+                generate_output_dir(output_base, acc)
+                if hasattr(args, "timestamped_output")
+                else os.path.join(output_base, acc)
+            )
+            
+    print("\n[GenomeProfiler CLI] All processing complete.\n")
 
 
 if __name__ == "__main__":

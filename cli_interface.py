@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 
 import os
-import sys
 import argparse
 from datetime import datetime
+
 
 def generate_output_dir(base_dir, accession):
     # Returns a timestamped subdirectory path for a given accession.
@@ -14,9 +14,34 @@ def generate_output_dir(base_dir, accession):
     return path
 
 
-def parse_cli_args():
-    parser = argparse.ArgumentParser(description="GenomeProfiler CLI Pipeline")
-    parser.add_argument("accessions", nargs="+", help="One or more NCBI accession IDs")
+def parse_command_line_args():
+    parser = argparse.ArgumentParser(
+        description="GenomeProfiler CLI - A tool for automated genome feature profiling and visualization.",
+        epilog=""" 
+Available Tools (use with --include-tools):
+  abricate       - Run abricate for resistance gene profiling
+  isescan        - Run ISEScan to identify insertion sequences
+  mobileog       - Run MobileOG-db analysis
+  ectyper        - Run ECTyper for serotyping
+  tncentral      - Run BLASTn search against TnCentral
+  integron       - Run Integron Finder
+  islandviewer   - Submit genome to IslandViewer for island prediction
+  plsdb          - Use PLSDB for plasmid similarity screening
+  phastest       - Run local PHASTEST search for phage regions
+  parser         - Parse tool outputs for visualization (enabled by default in GUI)
+
+Examples:
+  python cli_main.py NZ_CP000000
+  python cli_main.py NZ_CP000000 --include-tools abricate parser --timestamped-output
+  python cli_main.py --help
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "accessions",
+        nargs="*",
+        help="NCBI accession(s) to process (optional if using --fasta or --genbank)",
+    )
     parser.add_argument(
         "--include-tools",
         nargs="*",
@@ -44,4 +69,12 @@ def parse_cli_args():
     parser.add_argument(
         "--accession", help="(internal) Single accession for subprocess execution"
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.accessions and not args.fasta and not args.genbank:
+        parser.error(
+            "You must provide at least one accession or use --fasta/--genbank."
+        )
+    return args
+
+
+parse_args_from_cli = parse_command_line_args
