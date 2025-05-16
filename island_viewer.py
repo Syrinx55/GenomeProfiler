@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Jacob Alford <jalford0000@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 
+import os
 import requests
 import sys
 from requests_toolbelt.multipart.encoder import MultipartEncoder
@@ -25,8 +26,8 @@ def submit_islandviewer_job(genbank_path, config):
       dict: Parsed JSON response from IslandViewer.
     """
     # Get values from the config file
-    email = config.get("entrez_email")
-    token = config.get("islandviewer_auth_token")
+    email = os.environ["GENPROF_ENTREZ_EMAIL"]
+    token = os.environ["GENPROF_ISLANDVIEWER_AUTH_TOKEN"]
 
     if not email or not token:
         raise ValueError(
