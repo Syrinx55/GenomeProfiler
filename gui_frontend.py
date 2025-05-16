@@ -4,13 +4,15 @@
 import tkinter as tk
 from tkinter import messagebox, scrolledtext, filedialog, ttk
 from threading import Thread
-import subprocess
-import sys
 import os
 import json
+from pathlib import Path
 from collection_pipeline import process_accession, load_config, validate_environment
-from gui_file_upload import get_fasta_path, get_genbank_path
 from Bio import Entrez
+from data_parser import run_parser
+from dotenv import load_dotenv
+
+CONFIG_FILE = "config_genomeprofiler.ini"
 
 SETTINGS_FILE = "user_settings.json"
 
@@ -48,11 +50,13 @@ def launch_pipeline(
     genbank_path,
     progress,
     timestamp_output,
+    parser_var,
 ):
     config = load_config()
+    load_dotenv()
     validate_environment(config)
 
-    Entrez.email = config["entrez_email"]
+    Entrez.email = os.environ["GENPROF_ENTREZ_EMAIL"]
 
     ascii_art = r"""
 
@@ -82,6 +86,14 @@ def launch_pipeline(
                 genbank_override=genbank_path,
                 timestamp_output=timestamp_output,
             )
+            try:
+                if parser_var.get():
+                    run_parser(Path(config["output_base"]) / acc)
+            except Exception as parser_err:
+                debug_textbox.insert(
+                    tk.END, f"[ERROR] Parsing failed: {str(parser_err)}\n"
+                )
+                debug_textbox.see(tk.END)
     except Exception as e:
         debug_textbox.insert(tk.END, f"\n[ERROR] {str(e)}\n")
     debug_textbox.insert(tk.END, "\n[INFO] Done.\n")
@@ -90,8 +102,19 @@ def launch_pipeline(
     progress.pack_forget()
 
 
+def get_local_identifier_from_fasta(path):
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                if line.startswith(">"):
+                    return line[1:].strip().split()[0]
+    except Exception:
+        pass
+    return "local"
+
+
 def start_execution(
-    entry, checkboxes, worker_spin, fasta_path, genbank_path, timestamp_var
+    entry, checkboxes, worker_spin, fasta_path, genbank_path, timestamp_var, parser_var
 ):
     accessions = entry.get().strip()
     selected_tools = [tool for tool, var in checkboxes.items() if var.get() == 1]
@@ -119,10 +142,16 @@ def start_execution(
     progress.pack(pady=5)
     progress.start()
 
+    accession_list = (
+        accessions.split(",")
+        if accessions
+        else [get_local_identifier_from_fasta(fasta_path.get())]
+    )
+
     thread = Thread(
         target=launch_pipeline,
         args=(
-            accessions.split(",") if accessions else ["local"],
+            accession_list,
             selected_tools,
             workers,
             debug_textbox,
@@ -130,6 +159,7 @@ def start_execution(
             genbank_path.get() or None,
             progress,
             timestamp_var.get(),
+            parser_var,
         ),
     )
     thread.daemon = True
@@ -189,6 +219,11 @@ def main():
     worker_spin.insert(0, user_settings.get("workers", 2))
     worker_spin.pack(pady=5)
 
+    parser_var = tk.IntVar()
+    tk.Checkbutton(root, text="Parse data for visualization", variable=parser_var).pack(
+        pady=5
+    )
+
     timestamp_var = tk.IntVar()
     tk.Checkbutton(
         root, text="Use Timestamped Output Directory", variable=timestamp_var
@@ -204,6 +239,7 @@ def main():
             fasta_path,
             genbank_path,
             timestamp_var,
+            parser_var,
         ),
     ).pack(pady=10)
 
