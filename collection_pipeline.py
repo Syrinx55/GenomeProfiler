@@ -3,31 +3,23 @@
 
 import os
 import re
-import csv
-import sys
-import argparse
 import time
 import requests
 import subprocess
 import json
-import gzip
 import zipfile
 import pandas as pd
 from Bio import Entrez
 from Bio import SeqIO
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
 from ratelimit import limits, sleep_and_retry
-from time import sleep
-from plsdbapi import query
-from requests_toolbelt.multipart.encoder import MultipartEncoder
 from island_viewer import submit_islandviewer_job
 
 
 # Point to the config file and settings
 # This file contains your paths as well as your entrez email and API key
-CONFIG_FILE = "config_plasmidviz.ini"
+CONFIG_FILE = "config_genomeprofiler.ini"
 SECTION = "brig_settings"
 
 
@@ -37,7 +29,6 @@ def load_config():
         raise FileNotFoundError(f"Missing config file: {CONFIG_FILE}")
 
     required_keys = [
-        "entrez_email",
         "output_base",
         "max_workers",
         "sleep_interval",
@@ -46,7 +37,6 @@ def load_config():
         "isescan_path",
         "ectyper_path",
         "islandviewer_api_submit",
-        "islandviewer_auth_token",
         "prodigal_path",
         "diamond_path",
         "mobileog_db_faa",
@@ -107,7 +97,7 @@ def api_request(
 ):  # Submit API request (ensure email is correct)
     headers = kwargs.pop("headers", {})
     headers.update(
-        {"User-Agent": f"BRIG-Automator/1.0 (contact: {config['entrez_email']})"}
+        {"User-Agent": f"GenomeProfiler/1.0 (contact: {os.environ["GENPROF_ENTREZ_EMAIL"]})"}
     )
 
     try:
@@ -121,14 +111,27 @@ def api_request(
 
 def fetch_ncbi_data(accession, config):
     try:
-        # 1. FASTA
+        Entrez.email = os.environ['GENPROF_ENTREZ_EMAIL']
+
+        # First, try to resolve accession via esearch if it's not already a valid ID
+        print(f"[INFO] Resolving accession via Entrez search for: {accession}")
+        search_handle = Entrez.esearch(db="nucleotide", term=accession, retmode="xml")
+        search_results = Entrez.read(search_handle)
+        ids = search_results.get("IdList", [])
+        if not ids:
+            print(f"[ERROR] No matching accession found for: {accession}")
+            return None, None
+        resolved_id = ids[0]
+        print(f"[SUCCESS] Using resolved NCBI ID: {resolved_id}")
+
+        # Fetch FASTA
         handle = Entrez.efetch(
-            db="nucleotide", id=accession, rettype="fasta", retmode="text"
+            db="nucleotide", id=resolved_id, rettype="fasta", retmode="text"
         )
         fasta = handle.read()
-        # 2. GenBank (full w/ parts)
+        # Fetch GenBank
         handle = Entrez.efetch(
-            db="nucleotide", id=accession, rettype="gbwithparts", retmode="text"
+            db="nucleotide", id=resolved_id, rettype="gbwithparts", retmode="text"
         )
         genbank = handle.read()
         return fasta, genbank
@@ -189,7 +192,7 @@ def run_abricate(fasta_path, output_dir, config):
         "card",
         "argannot",
         "resfinder",
-        "Ecoli_VF",
+        "ecoli_vf",
     ]  # Can be adjusted to add/omit certain dbs from search
 
     for db in dbs:
@@ -239,7 +242,7 @@ def poll_islandviewer_job(token, config, sleep_interval=3, timeout=10000):
     start_time = time.time()
     while time.time() - start_time < timeout:
         response = requests.get(
-            status_url, headers={"x-authtoken": config.get("islandviewer_auth_token")}
+            status_url, headers={"x-authtoken": os.environ["GENPROF_ISLANDVIEWER_AUTH_TOKEN"]}
         )
         response.raise_for_status()
         status_data = response.json()
@@ -265,7 +268,7 @@ def poll_islandviewer_job(token, config, sleep_interval=3, timeout=10000):
 
 def download_islandviewer_results(download_url, output_dir, accession, config):
     output_file = os.path.join(output_dir, f"{accession}_islandviewer.tsv")
-    headers = {"x-authtoken": config.get("islandviewer_auth_token")}
+    headers = {"x-authtoken": os.environ["GENPROF_ISLANDVIEWER_AUTH_TOKEN"]}
     print(f"[INFO] Downloading IslandViewer results from {download_url}...")
     response = requests.get(download_url, headers=headers)
     response.raise_for_status()
@@ -816,7 +819,7 @@ def run_phastest_region_search(fasta_path, output_dir, output_file, config):
     )
     diamond_out = os.path.join(output_dir, f"{accession}_phastest.tsv")
 
-    # Load GenBank features into CDS coordinate map
+    # Build a CDS map keyed by composite ID
     cds_map = {}
     for record in SeqIO.parse(genbank_path, "genbank"):
         for feature in record.features:
@@ -824,11 +827,16 @@ def run_phastest_region_search(fasta_path, output_dir, output_file, config):
                 start = int(feature.location.start) + 1
                 end = int(feature.location.end)
                 strand = feature.location.strand
-                protein_seq = feature.qualifiers["translation"][0]
-                cds_map[protein_seq] = {
+                locus_tag = feature.qualifiers.get("locus_tag", ["unknown"])[0]
+                product = feature.qualifiers.get("product", ["unknown"])[0]
+                header = f"{record.id}_{locus_tag}_start{start}_stop{end}_strand{strand}|{product}"
+                cds_map[header.split("|")[0]] = {
                     "start": start,
                     "end": end,
                     "strand": strand,
+                    "product": product,
+                    "record_id": record.id,
+                    "locus_tag": locus_tag,
                 }
 
     # Process DIAMOND hits
@@ -854,25 +862,22 @@ def run_phastest_region_search(fasta_path, output_dir, output_file, config):
 
     phage_hits = []
     for _, row in hits.iterrows():
-        hit_protein = row["sseqid"]
+        qid = row["qseqid"].split("|")[0]  # Remove product portion
+        sseqid = row["sseqid"]
         sstart = row["sstart"]
         send = row["send"]
 
-        protein_seq = None
-        for k in cds_map:
-            if hit_protein in k:
-                protein_seq = k
-                break
+        if qid not in cds_map:
+            continue
 
-        if protein_seq and protein_seq in cds_map:
-            cds = cds_map[protein_seq]
-            if cds["strand"] == 1:
-                nuc_start = cds["start"] + (min(sstart, send) - 1) * 3
-                nuc_end = cds["start"] + (max(sstart, send) - 1) * 3
-            else:
-                nuc_end = cds["end"] - (min(sstart, send) - 1) * 3
-                nuc_start = cds["end"] - (max(sstart, send) - 1) * 3
-            phage_hits.append((nuc_start, nuc_end, hit_protein))
+        cds = cds_map[qid]
+        if cds["strand"] == 1:
+            nuc_start = cds["start"] + (min(sstart, send) - 1) * 3
+            nuc_end = cds["start"] + (max(sstart, send) - 1) * 3
+        else:
+            nuc_end = cds["end"] - (min(sstart, send) - 1) * 3
+            nuc_start = cds["end"] - (max(sstart, send) - 1) * 3
+        phage_hits.append((nuc_start, nuc_end, sseqid))
 
     # Write results
     with open(output_file, "w") as f:
@@ -886,7 +891,6 @@ def run_phastest_region_search(fasta_path, output_dir, output_file, config):
 def summarize_phage_regions(
     phage_hits_tsv, genbank_path, summary_output_tsv, min_cluster_distance=10000
 ):
-    import numpy as np
     from collections import Counter
     import os
     from Bio import SeqIO
@@ -949,7 +953,6 @@ def summarize_phage_regions(
             completeness = "questionable"
         else:
             completeness = "incomplete"
-        from collections import Counter
 
         most_common_phage = Counter(region_df["phage_hit"]).most_common(1)[0][0]
         gc = gc_cache.get(i, "NA")
@@ -1108,9 +1111,10 @@ def process_accession(
     start_time = datetime.now()
 
     if timestamp_output and not output_override:
+        resolved_name = accession or "unknown"
         timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         output_override = os.path.join(
-            config["output_base"], f"{accession}_{timestamp}"
+            config["output_base"], f"{resolved_name}_{timestamp}"
         )
 
     # Use output_override in setup
@@ -1124,28 +1128,98 @@ def process_accession(
         log(f"[INFO] Using uploaded FASTA file: {fasta_override}")
         with open(fasta_override) as f:
             fasta = f.read()
-    else:
+        # If no accession is provided, attempt to resolve it from the FASTA header
+        if not accession:
+            try:
+                first_line = fasta.splitlines()[0]
+                if first_line.startswith(">"):
+                    query_id = first_line[1:].split()[0].strip()
+                    log(
+                        f"[INFO] Attempting to resolve accession from header: {query_id}"
+                    )
+                    Entrez.email = os.environ["GENPROF_ENTREZ_EMAIL"]
+                    search_handle = Entrez.esearch(
+                        db="nucleotide", term=query_id, retmode="xml"
+                    )
+                    search_results = Entrez.read(search_handle)
+                    ids = search_results.get("IdList", [])
+                    if ids:
+                        accession = ids[0].strip()
+                        accession = accession.strip()
+                        log(f"[SUCCESS] Found matching accession: {accession}")
+                        fasta, _ = fetch_ncbi_data(accession, config)
+                    else:
+                        log(
+                            f"[WARNING] No matching accession found for header: {query_id}"
+                        )
+                else:
+                    log(f"[WARNING] FASTA header does not start with '>': {first_line}")
+            except Exception as e:
+                log(f"[WARNING] Could not resolve accession from FASTA header: {e}")
+    elif accession:
         fasta, _ = fetch_ncbi_data(accession, config)
         if not fasta:
             log(f"[ERROR] Could not fetch FASTA for {accession}")
             return False
+    else:
+        log("[ERROR] No FASTA provided and no accession available.")
+        return False
 
-    with open(fasta_path, "w") as f:
-        f.write(fasta)
-
-    # GenBank fallback handling
+    # GenBank override handling
     if genbank_override and os.path.exists(genbank_override):
         log(f"[INFO] Using uploaded GenBank file: {genbank_override}")
         with open(genbank_override) as f:
             genbank = f.read()
-    else:
+        try:
+            for line in genbank.splitlines():
+                if line.startswith("ACCESSION"):
+                    parts = line.split()
+                    if len(parts) > 1:
+                        accession = parts[1].strip()
+                        accession = accession.strip()
+                        log(f"[INFO] Extracted accession from GenBank: {accession}")
+                        fetched_fasta, _ = fetch_ncbi_data(accession, config)
+                        if not fetched_fasta:
+                            log(f"[ERROR] Could not fetch FASTA for {accession}")
+                            return False
+                        fasta = fetched_fasta
+                    break
+        except Exception as e:
+            log(f"[WARNING] Could not extract accession from GenBank: {e}")
+
+        # Rebuild output directory based on updated accession
+        if timestamp_output:
+            timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+            output_override = os.path.join(
+                config["output_base"], f"{accession}_{timestamp}"
+            )
+        dirs = setup_directories(accession, config, output_override=output_override)
+
+        fasta_path = os.path.join(dirs["ncbi"], f"{accession}.fasta")
+        genbank_path = os.path.join(dirs["ncbi"], f"{accession}.gbk")
+
+        # Fetch the FASTA using the updated accession
+        fetched_fasta, _ = fetch_ncbi_data(accession, config)
+        if not fetched_fasta:
+            log(f"[ERROR] Could not fetch FASTA for {accession}")
+            return False
+        fasta = fetched_fasta
+    elif accession:
+        accession = accession.strip()
         _, genbank = fetch_ncbi_data(accession, config)
         if not genbank:
             log(f"[ERROR] Could not fetch GenBank for {accession}")
             return False
+    else:
+        log("[ERROR] No GenBank provided and no accession available.")
+        return False
 
     with open(genbank_path, "w") as f:
         f.write(genbank)
+
+    # Write the final, validated FASTA to file
+    with open(fasta_path, "w") as f:
+        f.write(fasta)
 
     try:
         log(f"[{accession}] Running BLASTn against tncentral")
@@ -1223,7 +1297,7 @@ def process_accession(
                 )
                 log(f"[{accession}] Using MASH output file: {mash_asm_output}")
 
-                email = config["entrez_email"]
+                email = os.environ["GENPROF_ENTREZ_EMAIL"]
                 download_plasmid_accessions(mash_output, dirs["plsdb"], email)
 
                 log(f"[{accession}] Downloading assemblies using NCBI Datasets CLI...")
@@ -1301,13 +1375,15 @@ def process_accession(
             phastest_outfile = os.path.join(
                 dirs["phastest"], f"{accession}_phage_hits.tsv"
             )
-        run_phastest_region_search(
-            fasta_path, dirs["phastest"], phastest_outfile, config
-        )
-        phastest_summary_file = os.path.join(
-            dirs["phastest"], f"{accession}_phastest_summary.tsv"
-        )
-        summarize_phage_regions(phastest_outfile, genbank_path, phastest_summary_file)
+            run_phastest_region_search(
+                fasta_path, dirs["phastest"], phastest_outfile, config
+            )
+            phastest_summary_file = os.path.join(
+                dirs["phastest"], f"{accession}_phastest_summary.tsv"
+            )
+            summarize_phage_regions(
+                phastest_outfile, genbank_path, phastest_summary_file
+            )
 
         if not included_tools or "islandviewer" in included_tools:
             log(f"[{accession}] Submitting genome to IslandViewer HTTP API...")
