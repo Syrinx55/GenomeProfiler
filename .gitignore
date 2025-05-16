@@ -1,1 +1,6 @@
 .DS_Store
+.env
+.cache
+.target
+__pycache__
+*.log
