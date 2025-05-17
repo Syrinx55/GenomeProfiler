@@ -202,6 +202,7 @@ def main():
         return
         
     config = load_config()
+    load_dotenv()
     validate_environment(config)
     Entrez.email = os.environ["GENPROF_ENTREZ_EMAIL"]
 
