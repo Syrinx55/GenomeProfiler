@@ -97,7 +97,9 @@ def api_request(
 ):  # Submit API request (ensure email is correct)
     headers = kwargs.pop("headers", {})
     headers.update(
-        {"User-Agent": f"GenomeProfiler/1.0 (contact: {os.environ["GENPROF_ENTREZ_EMAIL"]})"}
+        {
+            "User-Agent": f"GenomeProfiler/1.0 (contact: {os.environ['GENPROF_ENTREZ_EMAIL']})"
+        }
     )
 
     try:
@@ -111,7 +113,7 @@ def api_request(
 
 def fetch_ncbi_data(accession, config):
     try:
-        Entrez.email = os.environ['GENPROF_ENTREZ_EMAIL']
+        Entrez.email = os.environ["GENPROF_ENTREZ_EMAIL"]
 
         # First, try to resolve accession via esearch if it's not already a valid ID
         print(f"[INFO] Resolving accession via Entrez search for: {accession}")
@@ -242,7 +244,8 @@ def poll_islandviewer_job(token, config, sleep_interval=3, timeout=10000):
     start_time = time.time()
     while time.time() - start_time < timeout:
         response = requests.get(
-            status_url, headers={"x-authtoken": os.environ["GENPROF_ISLANDVIEWER_AUTH_TOKEN"]}
+            status_url,
+            headers={"x-authtoken": os.environ["GENPROF_ISLANDVIEWER_AUTH_TOKEN"]},
         )
         response.raise_for_status()
         status_data = response.json()
@@ -1026,7 +1029,9 @@ def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_fil
         lambda x: (
             "+"
             if cds_mapping.get(x, {}).get("strand") == 1
-            else "-" if cds_mapping.get(x, {}).get("strand") == -1 else None
+            else "-"
+            if cds_mapping.get(x, {}).get("strand") == -1
+            else None
         )
     )
 

@@ -200,7 +200,7 @@ def main():
 
             run_parser(Path(acc_out))
         return
-        
+
     config = load_config()
     load_dotenv()
     validate_environment(config)
@@ -209,9 +209,7 @@ def main():
     args = parse_args_from_cli()
     output_base = args.output_dir or config["output_base"]
 
-    print(
-        f"\n[GenomeProfiler CLI] Starting analysis with tools: {args.include_tools}"
-    )
+    print(f"\n[GenomeProfiler CLI] Starting analysis with tools: {args.include_tools}")
     print(f"[INFO] Using {args.workers} worker(s)")
     print(f"[INFO] Output base directory: {output_base}\n")
     if args.include_tools and "phastest" in args.include_tools:
@@ -228,7 +226,7 @@ def main():
                 if hasattr(args, "timestamped_output")
                 else os.path.join(output_base, acc)
             )
-            
+
     print("\n[GenomeProfiler CLI] All processing complete.\n")
 
 
