@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Jacob Alford <jalford0000@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 
+import genome_profiler
 import os
 import re
 import time
@@ -23,72 +24,11 @@ CONFIG_FILE = "config_genomeprofiler.ini"
 SECTION = "brig_settings"
 
 
-def load_config():
-    config = ConfigParser()
-    if not config.read(CONFIG_FILE):
-        raise FileNotFoundError(f"Missing config file: {CONFIG_FILE}")
+# FIXME call directly where referenced
+load_config = genome_profiler.load_config
 
-    required_keys = [
-        "output_base",
-        "max_workers",
-        "sleep_interval",
-        "abricate_path",
-        "integron_path",
-        "isescan_path",
-        "ectyper_path",
-        "islandviewer_api_submit",
-        "prodigal_path",
-        "diamond_path",
-        "mobileog_db_faa",
-        "mobileog_db_csv",
-        "nuccore_csv",  # Must point to 'nuccore.csv' with columns [NUCCORE_ACC, ASSEMBLY_UID]
-        "assembly_csv",  # Must point to 'assembly.csv' with columns [ASSEMBLY_UID, ASSEMBLY_ACC]
-        "plsdb_sketch_path",  # The local .msh file for MASH
-    ]
-
-    optional_defaults = {
-        "plsdb_timeout": "30",
-        "plsdb_max_results": "100",
-        "ectyper_cores": "2",
-    }
-
-    if not config.has_section(SECTION):
-        raise KeyError(f"Missing section: {SECTION}")
-
-    missing = [key for key in required_keys if not config.has_option(SECTION, key)]
-    if missing:
-        raise ValueError(f"Missing required config keys: {', '.join(missing)}")
-
-    # Set defaults for optional parameters
-    for key, value in optional_defaults.items():
-        if not config.has_option(SECTION, key):
-            config.set(SECTION, key, value)
-
-    return config[SECTION]
-
-
-def validate_environment(config):
-    checks = [
-        ("abricate", [config["abricate_path"], "--version"]),
-        ("integron_finder", [config["integron_path"], "--version"]),
-        ("isescan", [config["isescan_path"], "--version"]),
-        ("ectyper", [config["ectyper_path"], "--version"]),
-        ("diamond", [config["diamond_path"], "version"]),
-        ("prodigal", [config["prodigal_path"], "-v"]),
-    ]
-
-    missing = []
-    for name, cmd in checks:
-        try:
-            subprocess.run(
-                cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            missing.append(name)
-
-    if missing:
-        raise EnvironmentError(f"Missing tools: {', '.join(missing)}")
-
+# FIXME call directly where referenced
+validate_environment = genome_profiler.validate_environment
 
 @sleep_and_retry
 @limits(calls=1, period=1)
