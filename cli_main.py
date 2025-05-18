@@ -104,15 +104,6 @@ def load_config():
     return config[SECTION]
 
 
-# FIXME declaration shadows import (this declaration uses a name that already
-# exists in an import statement)
-def generate_output_dir(base, acc):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = os.path.join(base, f"{acc}_{timestamp}")
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
 def launch_with_logging(acc, config, args, output_dir, timestamped):
     logs_dir = os.path.join(output_dir, "logs")
     os.makedirs(logs_dir, exist_ok=True)
