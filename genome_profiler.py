@@ -114,7 +114,7 @@ def load_and_resolve_config_file(
     path="GenomeProfiler/config.ini",
     section="brig_settings",
     overrides={},
-) -> Union[None, Config]:
+) -> Union[None, Section]:
     DEFAULT_ENTRIES = {
         "islandviewer_api_submit": "https://www.pathogenomics.sfu.ca/islandviewer/http_api/rest/submit/",
         "islandviewer_api_status": "https://www.pathogenomics.sfu.ca/islandviewer/rest/job/{token}/",
