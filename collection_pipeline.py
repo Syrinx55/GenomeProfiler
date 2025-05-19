@@ -25,10 +25,11 @@ SECTION = "brig_settings"
 
 
 # FIXME call directly where referenced
-load_config = genome_profiler.load_config
+load_config = genome_profiler.load_and_resolve_config_file
 
 # FIXME call directly where referenced
 validate_environment = genome_profiler.validate_environment
+
 
 @sleep_and_retry
 @limits(calls=1, period=1)
@@ -969,9 +970,7 @@ def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_fil
         lambda x: (
             "+"
             if cds_mapping.get(x, {}).get("strand") == 1
-            else "-"
-            if cds_mapping.get(x, {}).get("strand") == -1
-            else None
+            else "-" if cds_mapping.get(x, {}).get("strand") == -1 else None
         )
     )
 
