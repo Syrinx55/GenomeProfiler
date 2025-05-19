@@ -7,7 +7,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from Bio import Entrez, SeqIO
 from configparser import ConfigParser
-from collection_pipeline import process_accession, validate_environment
+from collection_pipeline import process_accession
+from genome_profiler import validate_environment
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
 from pathlib import Path

@@ -24,13 +24,6 @@ CONFIG_FILE = "config_genomeprofiler.ini"
 SECTION = "brig_settings"
 
 
-# FIXME call directly where referenced
-load_config = genome_profiler.load_and_resolve_config_file
-
-# FIXME call directly where referenced
-validate_environment = genome_profiler.validate_environment
-
-
 @sleep_and_retry
 @limits(calls=1, period=1)
 def api_request(
