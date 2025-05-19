@@ -156,8 +156,7 @@ def load_and_resolve_config_file(
             config.set(section, key, DEFAULT_ENTRIES[key])
 
     for key in overrides:
-        if config.has_option(section, key):
-            config.set(section, key, overrides[key])
+        config.set(section, key, overrides[key])
 
     return parser[section]
 
