@@ -8,7 +8,6 @@ import os
 import json
 from pathlib import Path
 from collection_pipeline import process_accession
-from genome_profiler import validate_environment
 from Bio import Entrez
 from data_parser import run_parser
 from dotenv import load_dotenv
@@ -54,8 +53,6 @@ def launch_pipeline(
     parser_var,
     config,
 ):
-    validate_environment(config)
-
     Entrez.email = os.environ["GENPROF_ENTREZ_EMAIL"]
 
     ascii_art = r"""
