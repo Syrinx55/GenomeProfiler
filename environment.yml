@@ -2,6 +2,7 @@ name: genome-profiler
 channels:
   - bioconda
   - conda-forge
+  # TODO are these needed?
   - defaults
   - https://repo.anaconda.com/pkgs/main
   - https://repo.anaconda.com/pkgs/r
