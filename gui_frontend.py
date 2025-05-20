@@ -10,7 +10,6 @@ from pathlib import Path
 from collection_pipeline import process_accession
 from Bio import Entrez
 from data_parser import run_parser
-from dotenv import load_dotenv
 
 CONFIG_FILE = "config_genomeprofiler.ini"
 

@@ -1,7 +1,6 @@
 # Copyright (c) 2025 Jacob Alford <jalford0000@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 
-import genome_profiler
 import os
 import re
 import time
