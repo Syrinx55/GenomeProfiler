@@ -183,9 +183,9 @@ def load_and_resolve_config_file(
         "prodigal_path": "prodigal",
         "diamond_path": "diamond",
         "output_base": "output_GenomeProfiler",
-        "max_workers": str(cpu_count),
+        "max_workers": str(cpu_count()),
         "sleep_interval": "300",
-        "ectyper_cores": str(cpu_count),
+        "ectyper_cores": str(cpu_count()),
     }
 
     parser = ConfigParser()
@@ -195,7 +195,7 @@ def load_and_resolve_config_file(
         if not parser.read(path) or not parser.has_section(section):
             raise EnvironmentError(f"Configuration file not found at '{path}'")
     else:
-        parser.read_dict({"genome_profiler":{}})
+        parser.read_dict({"genome_profiler": {}})
 
     # From defaults not in config file
     for key in DEFAULT_ENTRIES:
