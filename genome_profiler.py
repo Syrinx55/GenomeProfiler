@@ -183,9 +183,9 @@ def load_and_resolve_config_file(
         "prodigal_path": "prodigal",
         "diamond_path": "diamond",
         "output_base": "output_GenomeProfiler",
-        "max_workers": str(cpu_count() / 2),
+        "max_workers": str(int(cpu_count() / 2)),
         "sleep_interval": "300",
-        "ectyper_cores": str(cpu_count() / 2),
+        "ectyper_cores": str(int(cpu_count() / 2)),
     }
 
     parser = ConfigParser()
