@@ -6,12 +6,25 @@ import sys
 from typing import Union
 
 
+AVAILABLE_TOOLS = {
+    "abricate",
+    "isescan",
+    "mobileog",
+    "ectyper",
+    "tncentral",
+    "integron",
+    "islandviewer",
+    "plsdb",
+    "parser",
+}
+
+
 def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="GenomeProfiler",
         description="A tool to automate genome feature profiling and visualization.",
         epilog="""
-Available Tools (use with --include-tools):
+Available Tools (use with --include):
   abricate       - Run abricate for resistance gene profiling.
   isescan        - Run ISEScan to identify insertion sequences.
   mobileog       - Run MobileOG-db analysis.
@@ -106,8 +119,7 @@ Examples:
     parser.add_argument(
         "--sleep-interval",
         type=int,
-        # FIXME add help msg
-        help="",
+        help="(in seconds) Delay between status polls to IslandViewer.",
     )
 
     return parser
@@ -178,13 +190,16 @@ def load_and_resolve_config_file(
 
     parser = ConfigParser()
 
+    # From config file
     if not parser.read(path) or not parser.has_section(section):
         return None
 
+    # From defaults not in config file
     for key in DEFAULT_ENTRIES:
         if not parser.has_option(section, key):
             parser.set(section, key, DEFAULT_ENTRIES[key])
 
+    # From overrides
     for key in overrides:
         parser.set(section, key, overrides[key])
 
@@ -245,8 +260,11 @@ def resolve_config_and_args() -> SectionProxy:
 
 
 def main():
-    resolve_config_and_args()
-    validate_environment()
+    config = resolve_config_and_args()
+    validate_environment(config)
+
+    # FIXME debug
+    print(vars(config))
 
 
 if __name__ == "__main__":
