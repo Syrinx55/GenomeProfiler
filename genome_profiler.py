@@ -167,7 +167,7 @@ def create_config_overrides(args: argparse.Namespace) -> dict:
 
 
 def load_and_resolve_config_file(
-    path: str,
+    path: Union[None, str],
     section: str,
     overrides: dict,
 ) -> Union[None, SectionProxy]:
@@ -190,8 +190,10 @@ def load_and_resolve_config_file(
     parser = ConfigParser()
 
     # From config file
-    if not parser.read(path):
-        parser = ConfigParser()
+    if path:
+        if not parser.read(path) or not parser.has_section(section):
+            raise EnvironmentError(f"Configuration file not found at '{path}'")
+    else:
         parser.read_dict({})
 
     # From defaults not in config file
@@ -251,8 +253,8 @@ def resolve_config_and_args() -> SectionProxy:
     config_overrides = create_config_overrides(args)
 
     config = load_and_resolve_config_file(
-        args.config or "GenomeProfiler/config.ini",
-        "brig_settings",
+        args.config,
+        "genome_profiler",
         config_overrides,
     )
 
