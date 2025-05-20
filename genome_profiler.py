@@ -195,7 +195,7 @@ def load_and_resolve_config_file(
         if not parser.read(path) or not parser.has_section(section):
             raise EnvironmentError(f"Configuration file not found at '{path}'")
     else:
-        parser.read_dict({})
+        parser.read_dict({"genome_profiler":{}})
 
     # From defaults not in config file
     for key in DEFAULT_ENTRIES:
