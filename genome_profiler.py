@@ -2,6 +2,7 @@ import argparse
 from configparser import ConfigParser, SectionProxy
 from multiprocessing import cpu_count
 from gui_frontend import main as gui_frontend_main
+from install_resources import install_resources
 import subprocess
 import sys
 from typing import Union
@@ -125,11 +126,6 @@ Examples:
     return parser
 
 
-def open_gui():
-    gui_frontend_main()
-    sys.exit(0)
-
-
 def create_resource_paths(resource_base_path: str) -> dict:
     return {
         "plsdb_meta_dir": f"{resource_base_path}/plsdb-meta-2024_05_31_v2",
@@ -249,7 +245,8 @@ def resolve_config_and_args() -> SectionProxy:
         sys.exit(0)
 
     if args.gui:
-        open_gui()
+        gui_frontend_main()
+        sys.exit(0)
 
     config_overrides = create_config_overrides(args)
 
@@ -258,6 +255,10 @@ def resolve_config_and_args() -> SectionProxy:
         "genome_profiler",
         config_overrides,
     )
+
+    if args.setup:
+        install_resources()
+        sys.exit(0)
 
     return config
 
