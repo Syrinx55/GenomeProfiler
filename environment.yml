@@ -19,3 +19,5 @@ dependencies:
   - ectyper
   - diamond
   - ncbi-datasets-cli
+  - lxml
+  - pycurl
