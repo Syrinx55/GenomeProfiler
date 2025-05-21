@@ -293,12 +293,14 @@ def resolve_config_and_args() -> SectionProxy:
     return config
 
 
+# TODO handle `ModuleNotFoundError` by suggesting to update and activate conda environment
 def main():
     config = resolve_config_and_args()
     validate_environment(config)
 
     # FIXME debug
     print(vars(config)["_sections"])
+    print("\nDEBUG")
 
 
 if __name__ == "__main__":
