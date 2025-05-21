@@ -299,7 +299,7 @@ def main():
     validate_environment(config)
 
     # FIXME debug
-    print(vars(config)["_sections"])
+    print("config loaded and environment validated")
     print("\nDEBUG")
 
 
