@@ -202,7 +202,7 @@ def load_and_resolve_config_file(
     for key in overrides:
         parser.set(section, key, overrides[key])
 
-    return parser
+    return parser[section]
 
 
 def validate_environment(config: SectionProxy):
