@@ -257,7 +257,7 @@ def resolve_config_and_args() -> SectionProxy:
     )
 
     if args.setup:
-        install_resources()
+        install_resources(config)
         sys.exit(0)
 
     return config
