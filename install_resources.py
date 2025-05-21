@@ -1,5 +1,6 @@
 from configparser import SectionProxy
 from lxml import html
+from pathlib import Path
 from pycurl import Curl
 import requests
 import tarfile
@@ -10,6 +11,34 @@ from zipfile import ZipFile
 URL_PLSDB_META = "https://ccb-microbe.cs.uni-saarland.de/plsdb2025/download_meta.tar.gz"
 URL_MOBILEOG_DB = "https://mobileogdb.flsi.cloud.vt.edu/entries/database_download"
 URL_TNCENTRAL_DB = "https://tncentral.ncc.unesp.br/api/download_blast/nc/tn_in_is"
+
+# Keys of config whose values should be files that exist
+VALUES_SHOULD_BE_FILES = [
+    "plsdb_sketch_path",
+    "assembly_csv",
+    "nuccore_csv",
+    "plasmidfinder.csv",
+    "typing.csv",
+    "taxonomy.csv",
+    "biosample.csv",
+    "changes.tsv",
+    "amr.tsv",
+    "plsdb_mashdb_sim.tsv",
+    "mobileog_db_faa",
+    "mobileog_db_csv",
+    "tncentral_fasta",
+]
+
+
+def _files_not_installed(config: SectionProxy) -> list[Path]:
+    not_installed = []
+
+    for key in VALUES_SHOULD_BE_FILES:
+        path = Path(config[key])
+        if not path.is_file():
+            not_installed.append(path)
+
+    return not_installed
 
 
 def _curl_download(fileobj, url: str):
