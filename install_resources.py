@@ -57,13 +57,13 @@ def install_tncentral_db(to_dir: str):
     _download_zip_and_extract(to_dir, URL_TNCENTRAL_DB)
 
 
-def install_resources(config: SectionProxy):
+def install_resources(config: SectionProxy, resource_path: str):
     print("Installing PLSDB meta...")
     install_plsdb_meta(config["plsdb_meta_dir"])
     print("Installed PLSDB meta.")
 
     print("Installing mobileOG-db...")
-    install_mobileog_db("mobileOG-db-beatrix-1.6")
+    install_mobileog_db(resource_path + "/mobileOG-db-beatrix-1.6")
     print("Installed mobileOG-db.")
 
     print("Installing TnCentral database...")
