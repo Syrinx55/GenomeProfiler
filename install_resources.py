@@ -36,7 +36,9 @@ TNCENTRAL_DB_VSBF = [
 ]
 
 
-def _files_not_installed(config: SectionProxy, values_should_be_files: list[str]) -> list[Path]:
+def files_not_installed(
+    config: SectionProxy, values_should_be_files: list[str]
+) -> list[Path]:
     not_installed = []
 
     for key in values_should_be_files:
@@ -74,6 +76,7 @@ def _download_zip_and_extract(to_dir: str, url: str):
 def _install_plsdb_meta(to_dir: str):
     _download_targz_and_extract(to_dir, URL_PLSDB_META)
 
+
 def _install_mobileog_db(to_dir: str):
     targz_url = None
     with requests.get(URL_MOBILEOG_DB) as page_response:
@@ -93,7 +96,7 @@ def _install_tncentral_db(to_dir: str):
 
 
 def install_plsdb_meta_if_not_present(to_dir: str, config: SectionProxy):
-    not_installed = _files_not_installed(config, PLSDB_META_VSBF)
+    not_installed = files_not_installed(config, PLSDB_META_VSBF)
     if len(not_installed) == 0:
         print("(PLSDB meta already installed.)")
         return
@@ -101,7 +104,7 @@ def install_plsdb_meta_if_not_present(to_dir: str, config: SectionProxy):
 
 
 def install_mobileog_db_if_not_present(to_dir: str, config: SectionProxy):
-    not_installed = _files_not_installed(config, MOBILEOG_DB_VSBF)
+    not_installed = files_not_installed(config, MOBILEOG_DB_VSBF)
     if len(not_installed) == 0:
         print("(mobileOG-db already installed.)")
         return
@@ -109,7 +112,7 @@ def install_mobileog_db_if_not_present(to_dir: str, config: SectionProxy):
 
 
 def install_tncentral_db_if_not_present(to_dir: str, config: SectionProxy):
-    not_installed = _files_not_installed(config, TNCENTRAL_DB_VSBF)
+    not_installed = files_not_installed(config, TNCENTRAL_DB_VSBF)
     if len(not_installed) == 0:
         print("(TnCentral database already installed.)")
         return
@@ -122,7 +125,9 @@ def install_resources(config: SectionProxy, resource_path: str):
     print("Installed PLSDB meta.")
 
     print("Installing mobileOG-db...")
-    install_mobileog_db_if_not_present(resource_path + "/mobileOG-db-beatrix-1.6", config)
+    install_mobileog_db_if_not_present(
+        resource_path + "/mobileOG-db-beatrix-1.6", config
+    )
     print("Installed mobileOG-db.")
 
     print("Installing TnCentral database...")

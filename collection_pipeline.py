@@ -962,7 +962,9 @@ def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_fil
         lambda x: (
             "+"
             if cds_mapping.get(x, {}).get("strand") == 1
-            else "-" if cds_mapping.get(x, {}).get("strand") == -1 else None
+            else "-"
+            if cds_mapping.get(x, {}).get("strand") == -1
+            else None
         )
     )
 

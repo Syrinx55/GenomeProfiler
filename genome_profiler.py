@@ -2,7 +2,7 @@ import argparse
 from configparser import ConfigParser, SectionProxy
 from multiprocessing import cpu_count
 from gui_frontend import main as gui_frontend_main
-from install_resources import install_resources
+import install_resources
 import subprocess
 import sys
 from typing import Union
@@ -205,7 +205,7 @@ def load_and_resolve_config_file(
     return parser[section]
 
 
-def validate_environment(config: SectionProxy):
+def _validate_tools(config: SectionProxy):
     checks = [
         ("abricate", [config["abricate_path"], "--version"]),
         ("integron_finder", [config["integron_path"], "--version"]),
@@ -225,7 +225,37 @@ def validate_environment(config: SectionProxy):
             missing.append(name)
 
     if missing:
-        raise EnvironmentError(f"Missing tools: {', '.join(missing)}")
+        raise EnvironmentError(
+            f"Missing tools: {', '.join(missing)}\n\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler"
+        )
+
+
+def _validate_resources(config: SectionProxy):
+    not_installed = []
+
+    not_installed.extend(
+        install_resources.files_not_installed(config, install_resources.PLSDB_META_VSBF)
+    )
+    not_installed.extend(
+        install_resources.files_not_installed(
+            config, install_resources.MOBILEOG_DB_VSBF
+        )
+    )
+    not_installed.extend(
+        install_resources.files_not_installed(
+            config, install_resources.TNCENTRAL_DB_VSBF
+        )
+    )
+
+    if len(not_installed) != 0:
+        raise FileNotFoundError(
+            f"Missing resource files: {not_installed}\n\n(Run with --setup to install resource files.)"
+        )
+
+
+def validate_environment(config: SectionProxy):
+    _validate_tools(config)
+    _validate_resources(config)
 
 
 def resolve_config_and_args() -> SectionProxy:
@@ -257,7 +287,7 @@ def resolve_config_and_args() -> SectionProxy:
     )
 
     if args.setup:
-        install_resources(config, args.resource_dir)
+        install_resources.install_resources(config, args.resource_dir)
         sys.exit(0)
 
     return config
@@ -265,7 +295,7 @@ def resolve_config_and_args() -> SectionProxy:
 
 def main():
     config = resolve_config_and_args()
-    # validate_environment(config)
+    validate_environment(config)
 
     # FIXME debug
     print(vars(config)["_sections"])
