@@ -13,7 +13,7 @@ URL_MOBILEOG_DB = "https://mobileogdb.flsi.cloud.vt.edu/entries/database_downloa
 URL_TNCENTRAL_DB = "https://tncentral.ncc.unesp.br/api/download_blast/nc/tn_in_is"
 
 # Keys of config whose values should be files that exist
-VALUES_SHOULD_BE_FILES = [
+PLSDB_META_VSBF = [
     "plsdb_sketch_path",
     "assembly_csv",
     "nuccore_csv",
@@ -24,16 +24,22 @@ VALUES_SHOULD_BE_FILES = [
     "changes.tsv",
     "amr.tsv",
     "plsdb_mashdb_sim.tsv",
+]
+
+MOBILEOG_DB_VSBF = [
     "mobileog_db_faa",
     "mobileog_db_csv",
+]
+
+TNCENTRAL_DB_VSBF = [
     "tncentral_fasta",
 ]
 
 
-def _files_not_installed(config: SectionProxy) -> list[Path]:
+def _files_not_installed(config: SectionProxy, values_should_be_files: list[str]) -> list[Path]:
     not_installed = []
 
-    for key in VALUES_SHOULD_BE_FILES:
+    for key in values_should_be_files:
         path = Path(config[key])
         if not path.is_file():
             not_installed.append(path)
@@ -65,10 +71,10 @@ def _download_zip_and_extract(to_dir: str, url: str):
             f_zip.extractall(path=to_dir)
 
 
-def install_plsdb_meta(to_dir: str):
+def _install_plsdb_meta(to_dir: str):
     _download_targz_and_extract(to_dir, URL_PLSDB_META)
 
-def install_mobileog_db(to_dir: str):
+def _install_mobileog_db(to_dir: str):
     targz_url = None
     with requests.get(URL_MOBILEOG_DB) as page_response:
         if page_response.status_code != 200:
@@ -82,19 +88,43 @@ def install_mobileog_db(to_dir: str):
     _download_zip_and_extract(to_dir, targz_url)
 
 
-def install_tncentral_db(to_dir: str):
+def _install_tncentral_db(to_dir: str):
     _download_zip_and_extract(to_dir, URL_TNCENTRAL_DB)
+
+
+def install_plsdb_meta_if_not_present(to_dir: str, config: SectionProxy):
+    not_installed = _files_not_installed(config, PLSDB_META_VSBF)
+    if len(not_installed) == 0:
+        print("(PLSDB meta already installed.)")
+        return
+    _install_plsdb_meta(to_dir)
+
+
+def install_mobileog_db_if_not_present(to_dir: str, config: SectionProxy):
+    not_installed = _files_not_installed(config, MOBILEOG_DB_VSBF)
+    if len(not_installed) == 0:
+        print("(mobileOG-db already installed.)")
+        return
+    _install_mobileog_db(to_dir)
+
+
+def install_tncentral_db_if_not_present(to_dir: str, config: SectionProxy):
+    not_installed = _files_not_installed(config, TNCENTRAL_DB_VSBF)
+    if len(not_installed) == 0:
+        print("(TnCentral database already installed.)")
+        return
+    _install_tncentral_db(to_dir)
 
 
 def install_resources(config: SectionProxy, resource_path: str):
     print("Installing PLSDB meta...")
-    install_plsdb_meta(config["plsdb_meta_dir"])
+    install_plsdb_meta_if_not_present(config["plsdb_meta_dir"], config)
     print("Installed PLSDB meta.")
 
     print("Installing mobileOG-db...")
-    install_mobileog_db(resource_path + "/mobileOG-db-beatrix-1.6")
+    install_mobileog_db_if_not_present(resource_path + "/mobileOG-db-beatrix-1.6", config)
     print("Installed mobileOG-db.")
 
     print("Installing TnCentral database...")
-    install_tncentral_db(config["tncentral_db"])
+    install_tncentral_db_if_not_present(config["tncentral_db"], config)
     print("Installed TnCentral database.")
