@@ -8,7 +8,9 @@ try:
     import sys
     from typing import Union
 except ModuleNotFoundError as e:
-    e.add_note("\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler")
+    e.add_note(
+        "\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler"
+    )
     raise e
 
 
@@ -291,7 +293,24 @@ def resolve_config_and_args(args: argparse.Namespace) -> SectionProxy:
     return config
 
 
-# TODO handle `ModuleNotFoundError` by suggesting to update and activate conda environment
+def _run_pipeline(
+    config: SectionProxy, args: argparse.Namespace, tools_to_run: set[str]
+):
+    """
+    :param SectionProxy config: Config, like `config["key"]`
+    :param argparse.Namespace args: Command line arguments, like `args.argument`
+    :param set[str] tools_to_run: Tools to run, like `"abricate" in tools_to_run` or `for tool in tools_to_run`
+    """
+
+    # TODO process these arguments:
+    # - args.accessions
+    # - args.fasta
+    # - args.genbank
+    # - args.no_interact
+
+    pass
+
+
 def main():
     cli_parser = create_argument_parser()
 
@@ -315,15 +334,11 @@ def main():
 
     tools_to_run = _resolve_tools(args)
 
-    # FIXME debug
-    print("config loaded and environment validated")
-    print("\nDEBUG")
+    # DEBUG
+    print("DEBUG: config loaded and environment validated.")
+    print("DEBUG: running pipeline...")
 
-    # TODO process these arguments:
-    # - args.accessions
-    # - args.fasta
-    # - args.genbank
-    # - args.no_interact
+    _run_pipeline(config, args, tools_to_run)
 
 
 if __name__ == "__main__":
