@@ -319,6 +319,12 @@ def main():
     print("config loaded and environment validated")
     print("\nDEBUG")
 
+    # TODO process these arguments:
+    # - args.accessions
+    # - args.fasta
+    # - args.genbank
+    # - args.no_interact
+
 
 if __name__ == "__main__":
     main()
