@@ -163,11 +163,24 @@ def create_config_overrides(args: argparse.Namespace) -> dict:
     return overrides
 
 
+def _resolve_tools(args: argparse.Namespace) -> set[str]:
+    return (AVAILABLE_TOOLS if args.all_tools else set(args.include)) - set(
+        args.exclude
+    )
+
+
 def load_and_resolve_config_file(
     path: Union[None, str],
     section: str,
     overrides: dict,
 ) -> Union[None, SectionProxy]:
+    """
+    Priority of options (descending):
+    1. CLI arguments
+    2. Config
+    3. Defaults
+    """
+
     DEFAULT_ENTRIES = {
         "islandviewer_api_submit": "https://www.pathogenomics.sfu.ca/islandviewer/http_api/rest/submit/",
         "islandviewer_api_status": "https://www.pathogenomics.sfu.ca/islandviewer/rest/job/{token}/",
@@ -258,26 +271,7 @@ def validate_environment(config: SectionProxy):
     _validate_resources(config)
 
 
-def resolve_config_and_args() -> SectionProxy:
-    """
-    Priority of options (descending):
-    1. CLI arguments
-    2. Config
-    3. Defaults
-    """
-
-    cli_parser = create_argument_parser()
-
-    args = cli_parser.parse_args()
-
-    if len(sys.argv) == 1:
-        cli_parser.print_help()
-        sys.exit(0)
-
-    if args.gui:
-        gui_frontend_main()
-        sys.exit(0)
-
+def resolve_config_and_args(args: argparse.Namespace) -> SectionProxy:
     config_overrides = create_config_overrides(args)
 
     config = load_and_resolve_config_file(
@@ -295,8 +289,27 @@ def resolve_config_and_args() -> SectionProxy:
 
 # TODO handle `ModuleNotFoundError` by suggesting to update and activate conda environment
 def main():
-    config = resolve_config_and_args()
+    cli_parser = create_argument_parser()
+
+    args = cli_parser.parse_args()
+
+    if len(sys.argv) == 1:
+        cli_parser.print_help()
+        sys.exit(0)
+
+    if args.gui:
+        gui_frontend_main()
+        sys.exit(0)
+
+    config = resolve_config_and_args(args)
+
+    if args.setup:
+        install_resources.install_resources(config, args.resource_dir)
+        sys.exit(0)
+
     validate_environment(config)
+
+    tools_to_run = _resolve_tools(args)
 
     # FIXME debug
     print("config loaded and environment validated")
