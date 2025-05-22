@@ -1,11 +1,15 @@
-import argparse
-from configparser import ConfigParser, SectionProxy
-from multiprocessing import cpu_count
-from gui_frontend import main as gui_frontend_main
-import install_resources
-import subprocess
-import sys
-from typing import Union
+try:
+    import argparse
+    from configparser import ConfigParser, SectionProxy
+    from multiprocessing import cpu_count
+    from gui_frontend import main as gui_frontend_main
+    import install_resources
+    import subprocess
+    import sys
+    from typing import Union
+except ModuleNotFoundError as e:
+    e.add_note("\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler")
+    raise e
 
 
 AVAILABLE_TOOLS = {
