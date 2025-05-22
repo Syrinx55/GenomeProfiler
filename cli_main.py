@@ -3,13 +3,11 @@
 
 import os
 import sys
-from datetime import datetime
 from dotenv import load_dotenv
 from Bio import Entrez, SeqIO
 from configparser import ConfigParser
 from collection_pipeline import process_accession
 from genome_profiler import validate_environment
-from concurrent.futures import ThreadPoolExecutor
 import subprocess
 from pathlib import Path
 from cli_interface import (
@@ -208,16 +206,13 @@ def main():
         print("[INFO] Phastest tool is enabled via --include-tools")
 
     accessions = args.accessions
-    futures = []
-    future_map = {}
 
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        for acc in accessions:
-            acc_out = (
-                generate_output_dir(output_base, acc)
-                if hasattr(args, "timestamped_output")
-                else os.path.join(output_base, acc)
-            )
+    for acc in accessions:
+        acc_out = (
+            generate_output_dir(output_base, acc)
+            if hasattr(args, "timestamped_output")
+            else os.path.join(output_base, acc)
+        )
 
     print("\n[GenomeProfiler CLI] All processing complete.\n")
 
