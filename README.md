@@ -14,6 +14,11 @@ Git is used to download GenomeProfiler.
 
 Follow [official instructions](https://git-scm.com/downloads) to install Git.
 
+Verify that Conda is available by printing its version:
+```bash
+git --version
+```
+
 ### Install Miniforge
 
 Follow [official instructions](https://github.com/conda-forge/miniforge?tab=readme-ov-file#install) to install Miniforge.
