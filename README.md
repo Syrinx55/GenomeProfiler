@@ -14,7 +14,7 @@ Git is used to download GenomeProfiler.
 
 Follow [official instructions](https://git-scm.com/downloads) to install Git.
 
-Verify that Conda is available by printing its version:
+Verify that Git is available by printing its version:
 ```bash
 git --version
 ```
@@ -27,6 +27,14 @@ Verify that Conda is available by printing its version:
 ```bash
 conda --version
 ```
+
+### Register Email with Entrez
+
+**TODO**
+
+### Get IslandViewer Token
+
+**TODO**
 
 ### Install GenomeProfiler
 
@@ -44,14 +52,14 @@ Environment variables used by GenomeProfiler may be written in `.env`.
 Copy template `.env` into current directory:
 ```bash
 cp GenomeProfiler/template/.env .
-```
+  ```
 
 Open `.env` in a text editor (GNU nano depicted here):
 ```bash
 nano .env
 ```
 
-**TODO:** Provide instructions for getting values to use.
+**TODO:** Specify what the individual keys / environment variables should be.
 
 Delete the sample values (after `=`) and replace them with your own values. Save and exit.
 
