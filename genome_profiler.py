@@ -7,6 +7,7 @@ try:
     import subprocess
     import sys
     from typing import Union
+    from collection_pipeline import process_accession
 except ModuleNotFoundError as e:
     e.add_note(
         "\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler"
@@ -301,14 +302,14 @@ def _run_pipeline(
     :param argparse.Namespace args: Command line arguments, like `args.argument`
     :param set[str] tools_to_run: Tools to run, like `"abricate" in tools_to_run` or `for tool in tools_to_run`
     """
-
-    # TODO process these arguments:
-    # - args.accessions
-    # - args.fasta
-    # - args.genbank
-    # - args.no_interact
-
-    pass
+    for accession in args.accessions:
+        process_accession(
+            accession=accession,
+            config=config,
+            included_tools=tools_to_run,
+            fasta_override=args.fasta,
+            genbank_override=args.genbank,
+        )
 
 
 def main():
