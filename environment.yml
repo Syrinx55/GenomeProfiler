@@ -12,7 +12,7 @@ dependencies:
   - ratelimit
   - requests-toolbelt
   - python-dotenv
-  - abricate
+  - abricate>=1.0.1
   - isescan
   - mash
   - integron_finder
