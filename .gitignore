@@ -1,7 +1,8 @@
 .DS_Store
 .env
 !/template/*
-.cache
-.target
 __pycache__
 *.log
+
+data_GenomeProfiler
+output_GenomeProfiler
