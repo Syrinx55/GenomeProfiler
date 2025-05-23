@@ -60,7 +60,7 @@ Activate `genome-profiler` Conda environment:
 conda activate genome-profiler
 ```
 
-Download resources (databases etc.) used by GenomeProfiler:
+Install resources (databases etc.) used by GenomeProfiler into current directory:
 ```bash
 GenomeProfiler/genome_profiler --setup
 ```
@@ -76,6 +76,8 @@ Print help message:
 ```bash
 GenomeProfiler/genome_profiler --help
 ```
+
+By default, GenomeProfiler will save its output to the current directory.
 
 ## Semantic Versioning
 
