@@ -67,7 +67,7 @@ Examples:
         "-g",
         "--gui",
         action="store_true",
-        help="Run GenomeProfiler in graphical mode. NOTE: This will ignore all other arguments.",
+        help="(W.I.P.) Run GenomeProfiler in graphical mode. NOTE: This will ignore all other arguments.",
     )
     parser.add_argument(
         "-t",
