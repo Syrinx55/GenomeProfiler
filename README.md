@@ -12,11 +12,11 @@ Welcome to GenomeProfiler! GenomeProfiler is a pipeline for the profiling of pro
 
 Git is used to download GenomeProfiler.
 
-Follow official instructions to install Git: <https://git-scm.com/downloads>
+Follow [official instructions](https://git-scm.com/downloads) to install Git.
 
 ### Install Miniforge
 
-Follow official instructions to install Miniforge: <https://github.com/conda-forge/miniforge?tab=readme-ov-file#install>
+Follow [official instructions](https://github.com/conda-forge/miniforge?tab=readme-ov-file#install) to install Miniforge.
 
 Verify that Conda is available by printing its version:
 ```bash
