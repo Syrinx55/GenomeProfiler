@@ -339,8 +339,8 @@ def main():
     tools_to_run = _resolve_tools(args)
 
     # DEBUG
-    print("DEBUG: config loaded and environment validated.")
-    print("DEBUG: running pipeline...")
+    print("[DEBUG] Config loaded and environment validated.")
+    print("[DEBUG] Running pipeline...")
 
     _run_pipeline(config, args, tools_to_run)
 
