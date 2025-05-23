@@ -43,7 +43,6 @@ Available Tools (use with --include):
   integron       - Run Integron Finder.
   islandviewer   - Submit genome to IslandViewer for island prediction.
   plsdb          - Use PLSDB for plasmid similarity screening.
-  phastest       - Run local PHASTEST search for phage regions.
   parser         - Parse tool outputs for visualization (enabled by default in GUI).
 
 Examples:
@@ -151,7 +150,6 @@ def create_resource_paths(resource_base_path: str) -> dict:
         "mobileog_db_csv": f"{resource_base_path}/mobileOG-db-beatrix-1.6/mobileOG-db-beatrix-1.6-All.csv",
         "tncentral_db": f"{resource_base_path}/tncentral-db",
         "tncentral_fasta": f"{resource_base_path}/tncentral-db/tncentral_integrall_isfinder.fa",
-        "phastest_db": f"{resource_base_path}/phastest/prophage_virus.db",
     }
 
 
