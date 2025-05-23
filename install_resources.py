@@ -58,11 +58,17 @@ def _curl_download(fileobj, url: str):
 
 
 def _download_targz_and_extract(to_dir: str, url: str):
-    with TemporaryFile() as f_download:
+    Path(to_dir).mkdir(parents=True, exist_ok=True)
+
+    temp_targz_path = to_dir + "/__temp_meta.tar.gz"
+
+    with open(temp_targz_path, "w+b") as f_download:
         _curl_download(f_download, url)
 
-        with tarfile.open(fileobj=f_download) as f_tar:
-            f_tar.extractall(path=to_dir)
+    with tarfile.open(temp_targz_path) as f_tar:
+        f_tar.extractall(path=to_dir)
+
+    Path(temp_targz_path).unlink(missing_ok=True)
 
 
 def _download_zip_and_extract(to_dir: str, url: str):
