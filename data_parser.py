@@ -7,7 +7,6 @@ import os
 import pandas as pd
 import argparse
 from pathlib import Path
-from configparser import ConfigParser
 
 
 def parse_cds_fasta(fasta_file, output_tsv):
@@ -185,18 +184,8 @@ def parse_isescan_inverted_repeats_gff(
                 out_unstr.write(f"{start}\t{end}\n")
 
 
-def load_config(config_path="config_genomeprofiler_REAL.ini", section="brig_settings"):
-    config = ConfigParser()
-    if not config.read(config_path):
-        raise FileNotFoundError(f"Missing config file: {config_path}")
-    if not config.has_section(section):
-        raise KeyError(f"Missing section: {section}")
-    return config[section]
-
-
-def run_parser(output_path, config_path="config_genomeprofiler_REAL.ini"):
+def run_parser(output_path):
     output_path = Path(output_path).expanduser().resolve()
-    load_config(config_path)
 
     # Diagnostic output
     print(f"[DEBUG] output_path: {output_path}")

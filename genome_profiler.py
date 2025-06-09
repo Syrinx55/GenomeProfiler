@@ -9,6 +9,8 @@ try:
     import sys
     from typing import Union
     from collection_pipeline import process_accession
+    from data_parser import run_parser
+    from pathlib import Path
 except ModuleNotFoundError as e:
     e.add_note(
         "\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler"
@@ -309,6 +311,8 @@ def _run_pipeline(
             fasta_override=args.fasta,
             genbank_override=args.genbank,
         )
+        if "parser" in tools_to_run:
+            run_parser(Path(config["output_base"]) / accession)
 
 
 def main():
