@@ -10,10 +10,14 @@ from pathlib import Path
 from collection_pipeline import process_accession
 from Bio import Entrez
 from data_parser import run_parser
+from configparser import ConfigParser
 
-CONFIG_FILE = "config_genomeprofiler.ini"
+GENOMEPROFILER_DIR = Path(os.path.realpath(__file__)).parent
 
-SETTINGS_FILE = "user_settings.json"
+CONFIG_FILE = GENOMEPROFILER_DIR / "config_genomeprofiler.ini"
+SECTION = "genome_profiler"
+
+SETTINGS_FILE = GENOMEPROFILER_DIR / "user_settings.json"
 
 TOOL_OPTIONS = [
     "abricate",
@@ -24,7 +28,6 @@ TOOL_OPTIONS = [
     "integron finder",
     "islandviewer",
     "plsdb",
-    "phastest",
 ]
 
 
@@ -38,6 +41,15 @@ def load_user_settings():
 def save_user_settings(settings):
     with open(SETTINGS_FILE, "w") as f:
         json.dump(settings, f)
+
+
+def load_config(config_path=CONFIG_FILE, section=SECTION):
+    config = ConfigParser()
+    if not config.read(config_path):
+        raise FileNotFoundError(f"Missing config file: {config_path}")
+    if not config.has_section(section):
+        raise KeyError(f"Missing section: {section}")
+    return config[section]
 
 
 def launch_pipeline(
@@ -75,7 +87,7 @@ def launch_pipeline(
         for acc in accessions:
             process_accession(
                 acc,
-                config,
+                config=load_config(),
                 included_tools=included_tools,
                 debug_textbox=debug_textbox,
                 fasta_override=fasta_path,
@@ -156,6 +168,7 @@ def start_execution(
             progress,
             timestamp_var.get(),
             parser_var,
+            load_config(),
         ),
     )
     thread.daemon = True

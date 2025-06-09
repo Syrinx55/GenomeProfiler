@@ -12,15 +12,8 @@ import pandas as pd
 from Bio import Entrez
 from Bio import SeqIO
 from datetime import datetime
-from configparser import ConfigParser
 from ratelimit import limits, sleep_and_retry
 from island_viewer import submit_islandviewer_job
-
-
-# Point to the config file and settings
-# This file contains your paths as well as your entrez email and API key
-CONFIG_FILE = "config_genomeprofiler.ini"
-SECTION = "brig_settings"
 
 
 @sleep_and_retry
@@ -716,212 +709,6 @@ def run_mobileogdb_genbank(genbank_path, output_dir, config):
     return diamond_out, cds_mapping
 
 
-def run_phastest_search(fasta_path, db_path, output_file, config):
-    cmd = [
-        config["diamond_path"],
-        "blastp",
-        "--query",
-        fasta_path,
-        "--db",
-        db_path,
-        "--id",
-        "90",
-        "--query-cover",
-        "90",
-        "--out",
-        output_file,
-        "--outfmt",
-        "6",
-        "--evalue",
-        "1e-5",
-        "--max-target-seqs",
-        "1",
-        "--threads",
-        str(config.get("max_workers", "2")),
-    ]
-    subprocess.run(cmd, check=True)
-    print(f"[SUCCESS] PHASTEST search complete. Results saved to {output_file}")
-
-
-def run_phastest_region_search(fasta_path, output_dir, output_file, config):
-    """
-    Processes the results of a DIAMOND phage search and attempts to map hits
-    to nucleotide coordinates using CDS features in the GenBank file.
-    """
-    # Derive accession from FASTA filename
-    accession = os.path.splitext(os.path.basename(fasta_path))[0]
-    genbank_path = os.path.join(
-        output_dir.replace("/phastest", "/ncbi"), f"{accession}.gbk"
-    )
-    diamond_out = os.path.join(output_dir, f"{accession}_phastest.tsv")
-
-    # Build a CDS map keyed by composite ID
-    cds_map = {}
-    for record in SeqIO.parse(genbank_path, "genbank"):
-        for feature in record.features:
-            if feature.type == "CDS" and "translation" in feature.qualifiers:
-                start = int(feature.location.start) + 1
-                end = int(feature.location.end)
-                strand = feature.location.strand
-                locus_tag = feature.qualifiers.get("locus_tag", ["unknown"])[0]
-                product = feature.qualifiers.get("product", ["unknown"])[0]
-                header = f"{record.id}_{locus_tag}_start{start}_stop{end}_strand{strand}|{product}"
-                cds_map[header.split("|")[0]] = {
-                    "start": start,
-                    "end": end,
-                    "strand": strand,
-                    "product": product,
-                    "record_id": record.id,
-                    "locus_tag": locus_tag,
-                }
-
-    # Process DIAMOND hits
-    if not os.path.exists(diamond_out):
-        print(f"[WARNING] PHASTEST results not found: {diamond_out}")
-        return
-
-    hits = pd.read_csv(diamond_out, sep="\t", header=None)
-    hits.columns = [
-        "qseqid",
-        "sseqid",
-        "pident",
-        "length",
-        "mismatch",
-        "gapopen",
-        "qstart",
-        "qend",
-        "sstart",
-        "send",
-        "evalue",
-        "bitscore",
-    ]
-
-    phage_hits = []
-    for _, row in hits.iterrows():
-        qid = row["qseqid"].split("|")[0]  # Remove product portion
-        sseqid = row["sseqid"]
-        sstart = row["sstart"]
-        send = row["send"]
-
-        if qid not in cds_map:
-            continue
-
-        cds = cds_map[qid]
-        if cds["strand"] == 1:
-            nuc_start = cds["start"] + (min(sstart, send) - 1) * 3
-            nuc_end = cds["start"] + (max(sstart, send) - 1) * 3
-        else:
-            nuc_end = cds["end"] - (min(sstart, send) - 1) * 3
-            nuc_start = cds["end"] - (max(sstart, send) - 1) * 3
-        phage_hits.append((nuc_start, nuc_end, sseqid))
-
-    # Write results
-    with open(output_file, "w") as f:
-        f.write("region_start\tregion_end\tphage_hit\n")
-        for start, end, name in phage_hits:
-            f.write(f"{start}\t{end}\t{name}\n")
-
-    print(f"[SUCCESS] PHASTEST phage region output written to {output_file}")
-
-
-def summarize_phage_regions(
-    phage_hits_tsv, genbank_path, summary_output_tsv, min_cluster_distance=10000
-):
-    from collections import Counter
-    import os
-    from Bio import SeqIO
-    import pandas as pd
-
-    if not os.path.exists(phage_hits_tsv):
-        print(
-            f"[WARNING] Cannot summarize PHASTEST results: missing file {phage_hits_tsv}"
-        )
-        return
-
-    # Read hits and sort by start position
-    hits = pd.read_csv(phage_hits_tsv, sep="\t")
-    hits = hits.sort_values("region_start")
-
-    # Group into regions by distance threshold
-    regions = []
-    current_region = []
-    last_end = -1
-
-    for _, row in hits.iterrows():
-        start, end = row["region_start"], row["region_end"]
-        if last_end == -1 or start - last_end <= min_cluster_distance:
-            current_region.append(row)
-        else:
-            if current_region:
-                regions.append(pd.DataFrame(current_region))
-            current_region = [row]
-        last_end = end
-
-    if current_region:
-        regions.append(pd.DataFrame(current_region))
-
-    # Parse GenBank for GC%
-    gc_cache = {}
-    for record in SeqIO.parse(genbank_path, "genbank"):
-        seq = record.seq
-        for i, region_df in enumerate(regions, start=1):
-            start = region_df["region_start"].min()
-            end = region_df["region_end"].max()
-            region_seq = seq[start - 1 : end]
-            gc = (
-                100
-                * float(region_seq.count("G") + region_seq.count("C"))
-                / len(region_seq)
-            )
-            gc_cache[i] = round(gc, 2)
-
-    # Score and completeness heuristics
-    summary_rows = []
-    for i, region_df in enumerate(regions, start=1):
-        start = region_df["region_start"].min()
-        end = region_df["region_end"].max()
-        length_kb = round((end - start + 1) / 1000, 1)
-        proteins = len(region_df)
-        score = min(150, proteins * 2 + 10)  # heuristic
-        if score >= 90:
-            completeness = "intact"
-        elif score >= 70:
-            completeness = "questionable"
-        else:
-            completeness = "incomplete"
-
-        most_common_phage = Counter(region_df["phage_hit"]).most_common(1)[0][0]
-        gc = gc_cache.get(i, "NA")
-        summary_rows.append(
-            [
-                i,
-                f"{length_kb}Kb",
-                completeness,
-                score,
-                proteins,
-                f"{start}-{end}",
-                most_common_phage,
-                gc,
-            ]
-        )
-
-    summary_df = pd.DataFrame(
-        summary_rows,
-        columns=[
-            "Region",
-            "Region Length",
-            "Completeness",
-            "Score",
-            "# Total Proteins",
-            "Region Position",
-            "Most Common Phage",
-            "GC %",
-        ],
-    )
-    summary_df.to_csv(summary_output_tsv, sep="\t", index=False)
-    print(f"[SUCCESS] PHASTEST summary output written to {summary_output_tsv}")
-
-
 def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_file):
     """
     Integrates the MobileOG Diamond output with CDS nucleotide coordinates and strand info.
@@ -1006,7 +793,6 @@ def setup_directories(accession, config, output_override=None):
         "ectyper": os.path.join(base_dir, "ectyper"),
         "mobileogdb": os.path.join(base_dir, "mobileogdb"),
         "assembly_fastas": os.path.join(base_dir, "assembly_fastas"),
-        "phastest": os.path.join(base_dir, "phastest"),
     }
     for d in dirs.values():
         os.makedirs(d, exist_ok=True)
@@ -1268,60 +1054,6 @@ def process_accession(
         if not included_tools or "ectyper" in included_tools:
             log(f"[{accession}] Running ectyper on the original accession...")
             run_ectyper(accession, dirs["ectyper"], config)
-
-        if not included_tools or "phastest" in included_tools:
-            log(f"[{accession}] Running phage region search via PHASTEST local db...")
-            phastest_faa = config["phastest_db"]
-            phastest_db = os.path.join(dirs["phastest"], "phastest_db")
-            phastest_out = os.path.join(dirs["phastest"], f"{accession}_phastest.tsv")
-
-            if not os.path.exists(phastest_db + ".dmnd"):
-                log("[INFO] Creating PHASTEST DIAMOND database...")
-                subprocess.run(
-                    [
-                        config["diamond_path"],
-                        "makedb",
-                        "--in",
-                        phastest_faa,
-                        "-d",
-                        phastest_db,
-                    ],
-                    check=True,
-                )
-                log("[SUCCESS] PHASTEST database created.")
-
-            phastest_protein_file = os.path.join(
-                dirs["phastest"], f"{accession}_proteins.faa"
-            )
-            with open(genbank_path) as handle, open(
-                phastest_protein_file, "w"
-            ) as out_f:
-                for record in SeqIO.parse(handle, "genbank"):
-                    for feat in record.features:
-                        if feat.type == "CDS" and "translation" in feat.qualifiers:
-                            protein = feat.qualifiers["translation"][0]
-                            locus_tag = feat.qualifiers.get("locus_tag", ["unknown"])[0]
-                            product = feat.qualifiers.get("product", ["unknown"])[0]
-                            out_f.write(f">{locus_tag}|{product}\n{protein}\n")
-
-            run_phastest_search(
-                phastest_protein_file, phastest_db, phastest_out, config
-            )
-
-        if not included_tools or "phastest" in included_tools:
-            log(f"[{accession}] Running PHASTEST-style phage region search...")
-            phastest_outfile = os.path.join(
-                dirs["phastest"], f"{accession}_phage_hits.tsv"
-            )
-            run_phastest_region_search(
-                fasta_path, dirs["phastest"], phastest_outfile, config
-            )
-            phastest_summary_file = os.path.join(
-                dirs["phastest"], f"{accession}_phastest_summary.tsv"
-            )
-            summarize_phage_regions(
-                phastest_outfile, genbank_path, phastest_summary_file
-            )
 
         if not included_tools or "islandviewer" in included_tools:
             log(f"[{accession}] Submitting genome to IslandViewer HTTP API...")
