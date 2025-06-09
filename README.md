@@ -6,7 +6,7 @@ Welcome to GenomeProfiler! GenomeProfiler is a pipeline for the profiling of pro
 
 ## Install
 
-**NOTE:** Instructions are currently for `linux-64` and `osx-64`.
+**NOTE:** Instructions are currently for `linux-64` and `osx-64` architectures.
 
 ### Install Git
 
@@ -30,26 +30,38 @@ conda --version
 
 ### Register Email with Entrez
 
-Registering an email with Entrez is not necessary for use, and `.env` will accept any valid email address. However, registration will allow for the processing of more accessions simultaneously in a given run. To register, visit the [NCBI Entrez website](https://www.ncbi.nlm.nih.gov/search/) and click "Log in". Create an account using your preferred email. If you do not wish to create an NCBI account, simply use a valid email.
+Registering an email with Entrez is not necessary for use, and the `GENPROF_ENTREZ_EMAIL` environment variable (see [Install GenomeProfiler](#install-genomeprofiler)) may be set to any valid email address.
+However, registration will allow for the processing of more accessions simultaneously in a given run.
+To register, visit the [NCBI Entrez website](https://www.ncbi.nlm.nih.gov/search/) and click "Log in".
+Create an account using your preferred email. If you do not wish to create an NCBI account, simply use a valid email.
+A later step will instruct you to include this email address in your `.env` file.
 
 ### Get IslandViewer Token
 
-Visit the [IslandViewer website](https://www.pathogenomics.sfu.ca/islandviewer/) to create an account and obtain an API token. Navigate to the "Login" tab and create an account or sign in to an existing one. Once signed in, navigate to the "Jobs" tab and click "HTTP API Token". Copy the token for use in `.env`. *Note that the API key expires every 30 days and needs to be renewed.*
+*(For the* `islandviewer` *tool.)*
+
+Visit the [IslandViewer website](https://www.pathogenomics.sfu.ca/islandviewer/) to create an account and obtain an API token.
+Navigate to the "Login" tab and create an account or sign into an existing one.
+Once you are signed in, navigate to the "Jobs" tab and click "HTTP API Token".
+A later step will instruct you to include this token in your `.env` file.
+*Note that this API key expires every 30 days and needs to be renewed.*
 
 ### Install GenomeProfiler
+
+Navigate to the directory in which you want to install GenomeProfiler.
 
 Clone GenomeProfiler from GitHub:
 ```bash
 git clone https://github.com/Syrinx55/GenomeProfiler.git
 ```
 
-Create and update `genome-profiler` Conda environment:
+Create and update the `genome-profiler` Conda environment:
 ```bash
 conda env update --prune -f GenomeProfiler/environment.yml
 ```
 
 Environment variables used by GenomeProfiler may be written in `.env`.
-Copy template `.env` into current directory:
+Copy the template `.env` into the current directory:
 ```bash
 cp GenomeProfiler/template/.env .
   ```
@@ -59,38 +71,52 @@ Open `.env` in a text editor (GNU nano depicted here):
 nano .env
 ```
 
-Keys in the `.env` file should be as follows: 
-`GENPROF_ENTREZ_EMAIL`: your valid email address.
-`GENPROF_ISLANDVIEWER_AUTH_TOKEN`: your API key from IslandViewer.
+The entries of the `.env` file are as follows: 
+- `GENPROF_ENTREZ_EMAIL`: your valid email address.
+- `GENPROF_ISLANDVIEWER_AUTH_TOKEN`: your API key from IslandViewer.
 
 Delete the sample values (after `=`) and replace them with your own values. Save and exit.
 
-Activate `genome-profiler` Conda environment:
+Activate the `genome-profiler` Conda environment:
 ```bash
 conda activate genome-profiler
 ```
 
-Install resources (databases etc.) used by GenomeProfiler into current directory:
+Install resources (databases etc.) used by GenomeProfiler into the current directory:
 ```bash
 GenomeProfiler/genome_profiler --setup
 ```
 
 ## Usage
 
+### Graphical Mode
+
+**W.I.P.**
+
+Open the `GenomeProfiler` directory within a graphical file manager (e.g. Finder). Double-click `genome_profiler_gui`.
+
+By default, GenomeProfiler will save its output within the parent directory of the `GenomeProfiler` directory.
+
+### Command Line Interface
+
 Activate `genome-profiler` Conda environment:
 ```bash
 conda activate genome-profiler
 ```
 
-Print help message:
+Print the help message:
 ```bash
 GenomeProfiler/genome_profiler --help
 ```
 
-By default, GenomeProfiler will save its output to the current directory.
+By default, GenomeProfiler will save its output within the current directory.
 
 ## Semantic Versioning
 
 This repository adheres to Semantic Versioning 2.0.0: <https://semver.org/>.
 
 The current version of this repository is stated in `./VERSION.txt`.
+
+## Acknowledgements
+
+- Benjamin Alford ([Ssolar5](https://github.com/ssolar5)): Packaging for distribution, command-line interface, documentation, cleanup.
