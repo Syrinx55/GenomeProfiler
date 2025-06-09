@@ -30,11 +30,11 @@ conda --version
 
 ### Register Email with Entrez
 
-**TODO**
+Registering an email with Entrez is not necessary for use, and `.env` will accept any valid email address. However, registration will allow for the processing of more accessions simultaneously in a given run. To register, visit the [NCBI Entrez website](https://www.ncbi.nlm.nih.gov/search/) and click "Log in". Create an account using your preferred email. If you do not wish to create an NCBI account, simply use a valid email.
 
 ### Get IslandViewer Token
 
-**TODO**
+Visit the [IslandViewer website](https://www.pathogenomics.sfu.ca/islandviewer/) to create an account and obtain an API token. Navigate to the "Login" tab and create an account or sign in to an existing one. Once signed in, navigate to the "Jobs" tab and click "HTTP API Token". Copy the token for use in `.env`. *Note that the API key expires every 30 days and needs to be renewed.*
 
 ### Install GenomeProfiler
 
@@ -59,7 +59,9 @@ Open `.env` in a text editor (GNU nano depicted here):
 nano .env
 ```
 
-**TODO:** Specify what the individual keys / environment variables should be.
+Keys in the `.env` file should be as follows: 
+`GENPROF_ENTREZ_EMAIL`: your valid email address.
+`GENPROF_ISLANDVIEWER_AUTH_TOKEN`: your API key from IslandViewer.
 
 Delete the sample values (after `=`) and replace them with your own values. Save and exit.
 
