@@ -749,9 +749,7 @@ def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_fil
         lambda x: (
             "+"
             if cds_mapping.get(x, {}).get("strand") == 1
-            else "-"
-            if cds_mapping.get(x, {}).get("strand") == -1
-            else None
+            else "-" if cds_mapping.get(x, {}).get("strand") == -1 else None
         )
     )
 
@@ -833,6 +831,8 @@ def process_accession(
             print(msg)
 
     start_time = datetime.now()
+    fasta = None
+    genbank = None
 
     if timestamp_output and not output_override:
         resolved_name = accession or "unknown"
@@ -847,12 +847,64 @@ def process_accession(
     fasta_path = os.path.join(dirs["ncbi"], f"{accession}.fasta")
     genbank_path = os.path.join(dirs["ncbi"], f"{accession}.gbk")
 
-    # FASTA fallback handling
-    if fasta_override and os.path.exists(fasta_override):
+    # FASTA and GenBank override handling with match check
+    if (
+        fasta_override
+        and os.path.exists(fasta_override)
+        and genbank_override
+        and os.path.exists(genbank_override)
+    ):
+        log(f"[INFO] Using uploaded FASTA file: {fasta_override}")
+        log(f"[INFO] Using uploaded GenBank file: {genbank_override}")
+
+        with open(fasta_override) as f_fa, open(genbank_override) as f_gb:
+            fasta = f_fa.read()
+            genbank = f_gb.read()
+
+        # Extract ID from FASTA header
+        fasta_id = None
+        try:
+            first_line = fasta.splitlines()[0]
+            if first_line.startswith(">"):
+                fasta_id = first_line[1:].split()[0].strip()
+        except Exception as e:
+            log(f"[WARNING] Failed to extract ID from FASTA: {e}")
+
+        # Extract ACCESSION from GenBank
+        genbank_id = None
+        try:
+            for line in genbank.splitlines():
+                if line.startswith("ACCESSION"):
+                    parts = line.split()
+                    if len(parts) > 1:
+                        genbank_id = parts[1].strip()
+                        break
+        except Exception as e:
+            log(f"[WARNING] Failed to extract accession from GenBank: {e}")
+
+        # If both match, skip NCBI query; else try fallback via filename
+        if fasta_id and genbank_id and fasta_id == genbank_id:
+            accession = fasta_id
+            log(
+                f"[SUCCESS] FASTA and GenBank IDs match: {accession}. Skipping NCBI query."
+            )
+        else:
+            # Fallback: try matching base filenames
+            fasta_base = os.path.splitext(os.path.basename(fasta_override))[0]
+            genbank_base = os.path.splitext(os.path.basename(genbank_override))[0]
+            if fasta_base == genbank_base:
+                accession = fasta_base
+                log(
+                    f"[SUCCESS] Using base filename match: {accession}. Skipping NCBI query."
+                )
+            else:
+                log("[INFO] IDs do not match and fallback match also failed.")
+                fasta, accession = None, None
+
+    if not fasta and fasta_override and os.path.exists(fasta_override):
         log(f"[INFO] Using uploaded FASTA file: {fasta_override}")
         with open(fasta_override) as f:
             fasta = f.read()
-        # If no accession is provided, attempt to resolve it from the FASTA header
         if not accession:
             try:
                 first_line = fasta.splitlines()[0]
@@ -869,7 +921,6 @@ def process_accession(
                     ids = search_results.get("IdList", [])
                     if ids:
                         accession = ids[0].strip()
-                        accession = accession.strip()
                         log(f"[SUCCESS] Found matching accession: {accession}")
                         fasta, _ = fetch_ncbi_data(accession, config)
                     else:
@@ -880,17 +931,17 @@ def process_accession(
                     log(f"[WARNING] FASTA header does not start with '>': {first_line}")
             except Exception as e:
                 log(f"[WARNING] Could not resolve accession from FASTA header: {e}")
-    elif accession:
+    elif not fasta and accession:
         fasta, _ = fetch_ncbi_data(accession, config)
         if not fasta:
             log(f"[ERROR] Could not fetch FASTA for {accession}")
             return False
-    else:
+    elif not fasta:
         log("[ERROR] No FASTA provided and no accession available.")
         return False
 
     # GenBank override handling
-    if genbank_override and os.path.exists(genbank_override):
+    if genbank_override and os.path.exists(genbank_override) and not genbank:
         log(f"[INFO] Using uploaded GenBank file: {genbank_override}")
         with open(genbank_override) as f:
             genbank = f.read()
@@ -928,13 +979,25 @@ def process_accession(
             log(f"[ERROR] Could not fetch FASTA for {accession}")
             return False
         fasta = fetched_fasta
-    elif accession:
+    # If only a FASTA was uploaded, try to fetch the corresponding GenBank using the accession
+    elif (
+        fasta_override and os.path.exists(fasta_override) and not genbank and accession
+    ):
+        log(
+            f"[INFO] Attempting to fetch GenBank using accession from FASTA: {accession}"
+        )
+        _, fetched_genbank = fetch_ncbi_data(accession, config)
+        if not fetched_genbank:
+            log(f"[ERROR] Could not fetch GenBank for {accession}")
+            return False
+        genbank = fetched_genbank
+    elif accession and not genbank:
         accession = accession.strip()
         _, genbank = fetch_ncbi_data(accession, config)
         if not genbank:
             log(f"[ERROR] Could not fetch GenBank for {accession}")
             return False
-    else:
+    elif not genbank:
         log("[ERROR] No GenBank provided and no accession available.")
         return False
 
