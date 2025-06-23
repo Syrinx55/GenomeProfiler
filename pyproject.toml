@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "genome-profiler"
+version = "0.4.0"
+description = "Prokaryotic genome and plasmid profiling pipeline"
+authors = [{ name = "Jacob Alford", email = "jalford0000@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE.txt" }
+dependencies = [
+  "ratelimit",
+  "requests-toolbelt",
+  "python-dotenv",
+  "lxml",
+  "pycurl"
+]
+
+[project.scripts]
+genome_profiler = "cli_main:main"

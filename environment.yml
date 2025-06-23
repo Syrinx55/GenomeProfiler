@@ -1,13 +1,12 @@
 name: genome-profiler
 channels:
-  - bioconda
   - conda-forge
-  # TODO are these needed?
+  - bioconda
   - defaults
   - https://repo.anaconda.com/pkgs/main
   - https://repo.anaconda.com/pkgs/r
 dependencies:
-  - python
+  - python =3.10
   - bio
   - ratelimit
   - requests-toolbelt
