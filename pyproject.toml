@@ -20,3 +20,6 @@ dependencies = [
 
 [project.scripts]
 genome_profiler = "genome_profiler:main"
+
+[tool.setuptools]
+py-modules = ["genome_profiler"]
