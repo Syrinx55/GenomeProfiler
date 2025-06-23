@@ -19,4 +19,4 @@ dependencies = [
 ]
 
 [project.scripts]
-genome_profiler = "cli_main:main"
+genome_profiler = "genome_profiler:main"
