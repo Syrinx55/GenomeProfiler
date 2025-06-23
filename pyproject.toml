@@ -22,4 +22,4 @@ dependencies = [
 genome_profiler = "genome_profiler:main"
 
 [tool.setuptools]
-py-modules = ["genome_profiler"]
+py-modules = ["genome_profiler" , "collection_pipeline" , "data_parser" , "gui_file_upload" , "gui_frontend" , "install_resources" , "island_viewer"]
