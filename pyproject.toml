@@ -26,4 +26,4 @@ py-modules = ["genome_profiler" , "collection_pipeline" , "data_parser" , "gui_f
 include-package-data = true
 
 [tool.setuptools.package-data]
-"*" = ["config_genomeprofiler.ini"]
+"*" = ["config_genomeprofiler.ini" , "user_settings.json"]
