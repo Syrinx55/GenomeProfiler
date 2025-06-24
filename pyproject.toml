@@ -23,3 +23,7 @@ genome_profiler = "genome_profiler:main"
 
 [tool.setuptools]
 py-modules = ["genome_profiler" , "collection_pipeline" , "data_parser" , "gui_file_upload" , "gui_frontend" , "install_resources" , "island_viewer"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"" = ["config_genomeprofiler.ini"]

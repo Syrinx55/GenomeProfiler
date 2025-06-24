@@ -11,13 +11,14 @@ from collection_pipeline import process_accession
 from Bio import Entrez
 from data_parser import run_parser
 from configparser import ConfigParser
+from importlib.resources import files
 
 GENOMEPROFILER_DIR = Path(os.path.realpath(__file__)).parent
 
-CONFIG_FILE = GENOMEPROFILER_DIR / "config_genomeprofiler.ini"
+CONFIG_FILE = files(__package__).joinpath("config_genomeprofiler.ini")
 SECTION = "genome_profiler"
 
-SETTINGS_FILE = GENOMEPROFILER_DIR / "user_settings.json"
+SETTINGS_FILE = files(__package__).joinpath("user_settings.json")
 
 TOOL_OPTIONS = [
     "abricate",
