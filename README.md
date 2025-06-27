@@ -55,6 +55,11 @@ Clone GenomeProfiler from GitHub:
 git clone https://github.com/Syrinx55/GenomeProfiler.git
 ```
 
+Switch to release version 0.4.1:
+```bash
+git checkout release-0.4.1
+```
+
 Create and update the `genome-profiler` Conda environment:
 ```bash
 conda env update --prune -f GenomeProfiler/environment.yml
