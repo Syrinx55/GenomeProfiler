@@ -110,6 +110,11 @@ Examples:
         help="Base directory to store results (overrides: output_base in config; default: output_GenomeProfiler)",
     )
     parser.add_argument(
+        "--timestamp-output",
+        action="store_true",
+        help="Add timestamps to output directories.",
+    )
+    parser.add_argument(
         "-r",
         "--resource-dir",
         default="data_GenomeProfiler/resource",
@@ -121,9 +126,13 @@ Examples:
         help="Path to configuration file",
     )
     parser.add_argument(
-        "--timestamp-output",
+        "--env",
+        help="Path to file containing environment variables (default behavior: search recursively up directory tree for file named .env)."
+    )
+    parser.add_argument(
+        "--no-env",
         action="store_true",
-        help="Add timestamps to output directories.",
+        help="Do not look for a file containing environment variables (default behavior: see --env)",
     )
     parser.add_argument(
         "-n",
@@ -322,11 +331,11 @@ def _run_pipeline(
 
 
 def main():
-    load_dotenv(dotenv_path=find_dotenv(usecwd=True))
-
     cli_parser = create_argument_parser()
-
     args = cli_parser.parse_args()
+
+    if not args.no_env:
+        load_dotenv(dotenv_path=(args.env or find_dotenv(usecwd=True)))
 
     if len(sys.argv) == 1:
         cli_parser.print_help()
