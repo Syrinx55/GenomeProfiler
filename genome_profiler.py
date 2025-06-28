@@ -48,9 +48,9 @@ Available Tools (use with --include):
   parser         - Parse tool outputs for visualization (enabled by default in GUI).
 
 Examples:
-  python cli_main.py NZ_CP000000
-  python cli_main.py NZ_CP000000 --include-tools abricate parser --timestamped-output
-  python cli_main.py --help
+  genome_profiler NZ_CP000000
+  genome_profiler NZ_CP000000 --include-tools abricate parser --timestamped-output
+  genome_profiler --help
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
