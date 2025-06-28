@@ -127,7 +127,7 @@ Examples:
     )
     parser.add_argument(
         "--env",
-        help="Path to file containing environment variables (default behavior: search recursively up directory tree for file named .env)."
+        help="Path to file containing environment variables (default behavior: search recursively up directory tree for file named .env).",
     )
     parser.add_argument(
         "--no-env",
@@ -324,7 +324,7 @@ def _run_pipeline(
             included_tools=tools_to_run,
             fasta_override=args.fasta,
             genbank_override=args.genbank,
-            timestamp_output=args.timestamp_output
+            timestamp_output=args.timestamp_output,
         )
         if "parser" in tools_to_run:
             run_parser(Path(config["output_base"]) / accession)
