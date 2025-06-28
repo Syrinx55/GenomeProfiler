@@ -1,7 +1,7 @@
 try:
     import argparse
     from configparser import ConfigParser, SectionProxy
-    from dotenv import load_dotenv
+    from dotenv import find_dotenv, load_dotenv
     from multiprocessing import cpu_count
     from gui_frontend import main as gui_frontend_main
     import install_resources
@@ -316,7 +316,7 @@ def _run_pipeline(
 
 
 def main():
-    load_dotenv(usecwd=True)
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True))
 
     cli_parser = create_argument_parser()
 
