@@ -316,7 +316,7 @@ def _run_pipeline(
 
 
 def main():
-    load_dotenv()
+    load_dotenv(usecwd=True)
 
     cli_parser = create_argument_parser()
 
