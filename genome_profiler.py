@@ -350,6 +350,10 @@ def main():
     print("[DEBUG] Config loaded and environment validated.")
     print("[DEBUG] Running pipeline...")
 
+    if not tools_to_run:
+        print("[INFO] No tools selected to run. Exiting...")
+        sys.exit(0)
+
     _run_pipeline(config, args, tools_to_run)
 
 
