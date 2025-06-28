@@ -49,7 +49,7 @@ Available Tools (use with --include):
 
 Examples:
   genome_profiler NZ_CP000000
-  genome_profiler NZ_CP000000 --include-tools abricate parser --timestamped-output
+  genome_profiler NZ_CP000000 --include abricate parser --timestamp-output
   genome_profiler --help
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -129,7 +129,7 @@ Examples:
         "-n",
         "--no-interact",
         action="store_true",
-        help="Terminate instead of prompting for input. NOTE: Useful for scripts.",
+        help="Terminate instead of prompting for input. NOTE: Useful for scripts. (Currently does nothing.)",
     )
     parser.add_argument(
         "--sleep-interval",
