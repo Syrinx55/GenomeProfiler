@@ -121,6 +121,11 @@ Examples:
         help="Path to configuration file",
     )
     parser.add_argument(
+        "--timestamp-output",
+        action="store_true",
+        help="Add timestamps to output directories.",
+    )
+    parser.add_argument(
         "-n",
         "--no-interact",
         action="store_true",
@@ -310,6 +315,7 @@ def _run_pipeline(
             included_tools=tools_to_run,
             fasta_override=args.fasta,
             genbank_override=args.genbank,
+            timestamp_output=args.timestamp_output
         )
         if "parser" in tools_to_run:
             run_parser(Path(config["output_base"]) / accession)
