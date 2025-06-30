@@ -7,9 +7,9 @@ from threading import Thread
 import os
 import json
 from pathlib import Path
-from collection_pipeline import process_accession
+from .collection_pipeline import process_accession
 from Bio import Entrez
-from data_parser import run_parser
+from .data_parser import run_parser
 from configparser import ConfigParser
 
 GENOMEPROFILER_DIR = Path(os.path.realpath(__file__)).parent

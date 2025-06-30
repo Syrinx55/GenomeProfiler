@@ -6,11 +6,11 @@ import sys
 from dotenv import load_dotenv
 from Bio import Entrez, SeqIO
 from configparser import ConfigParser
-from collection_pipeline import process_accession
-from genome_profiler import validate_environment
+from .collection_pipeline import process_accession
+from .genome_profiler import validate_environment
 import subprocess
 from pathlib import Path
-from cli_interface import (
+from .cli_interface import (
     parse_args_from_cli,
     generate_output_dir,
 )

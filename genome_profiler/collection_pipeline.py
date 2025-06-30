@@ -13,7 +13,7 @@ from Bio import Entrez
 from Bio import SeqIO
 from datetime import datetime
 from ratelimit import limits, sleep_and_retry
-from island_viewer import submit_islandviewer_job
+from .island_viewer import submit_islandviewer_job
 
 
 @sleep_and_retry
@@ -749,9 +749,7 @@ def integrate_mobileog_annotations(mobileog_results_tsv, cds_mapping, output_fil
         lambda x: (
             "+"
             if cds_mapping.get(x, {}).get("strand") == 1
-            else "-"
-            if cds_mapping.get(x, {}).get("strand") == -1
-            else None
+            else "-" if cds_mapping.get(x, {}).get("strand") == -1 else None
         )
     )
 
