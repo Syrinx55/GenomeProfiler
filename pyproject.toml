@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genome-profiler"
-version = "0.4.0"
+version = "0.4.2-test.2"
 description = "Prokaryotic genome and plasmid profiling pipeline"
 authors = [{ name = "Jacob Alford", email = "jalford0000@gmail.com" }]
 readme = "README.md"
