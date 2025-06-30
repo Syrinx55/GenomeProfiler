@@ -1,6 +1,6 @@
 .DS_Store
 .env
-!/template/*
+!/genome_profiler/*
 __pycache__
 *.log
 

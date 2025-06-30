@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genome-profiler"
-version = "0.4.2-test.2"
+version = "0.4.2-test.3"
 description = "Prokaryotic genome and plasmid profiling pipeline"
 authors = [{ name = "Jacob Alford", email = "jalford0000@gmail.com" }]
 readme = "README.md"
@@ -22,8 +22,8 @@ dependencies = [
 genome_profiler = "genome_profiler:main"
 
 [tool.setuptools]
-py-modules = ["genome_profiler" , "collection_pipeline" , "data_parser" , "gui_file_upload" , "gui_frontend" , "install_resources" , "island_viewer"]
+packages = ["genome_profiler"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-"*" = ["config_genomeprofiler.ini" , "user_settings.json"]
+genome-profiler = ["config_genomeprofiler.ini" , "user_settings.json" , ".env"]
