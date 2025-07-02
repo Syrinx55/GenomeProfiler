@@ -53,6 +53,7 @@ def _curl_download(fileobj, url: str):
     cl = Curl()
     cl.setopt(cl.URL, url)
     cl.setopt(cl.WRITEDATA, fileobj)
+    cl.setopt(cl.USERAGENT, "Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0")
     cl.perform()
     cl.close()
 
