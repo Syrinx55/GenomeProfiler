@@ -68,21 +68,24 @@ conda env update --prune -f GenomeProfiler/environment.yml
 ```
 
 Environment variables used by GenomeProfiler may be written in `.env`.
-Copy the template `.env` into the current directory:
-```bash
-cp GenomeProfiler/template/.env .
-  ```
-
-Open `.env` in a text editor (GNU nano depicted here):
+Create a file named `.env` and open it in a text editor (GNU nano depicted here):
 ```bash
 nano .env
 ```
 
-The entries of the `.env` file are as follows: 
+Insert the following text into `.env`:
+
+```bash
+# genome_profiler
+GENPROF_ENTREZ_EMAIL=
+GENPROF_ISLANDVIEWER_AUTH_TOKEN=
+```
+
+The entries of `.env` are as follows: 
 - `GENPROF_ENTREZ_EMAIL`: your valid email address.
 - `GENPROF_ISLANDVIEWER_AUTH_TOKEN`: your API key from IslandViewer.
 
-Delete the sample values (after `=`) and replace them with your own values. Save and exit.
+Insert your own value after each corresponding `=`. Save and exit.
 
 Activate the `genome-profiler` Conda environment:
 ```bash
