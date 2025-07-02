@@ -1011,16 +1011,14 @@ def process_accession(
     try:
         log(f"[{accession}] Running BLASTn against tncentral")
         tncentral_fasta = config.get("tncentral_fasta")
-        tncentral_db = config.get("tncentral_db")
-
-        ensure_blastdb_exists(tncentral_fasta, tncentral_db)
+        ensure_blastdb_exists(tncentral_fasta, tncentral_fasta)
 
         blast_output = os.path.join(
             dirs["tncentral"], f"{accession}_tncentral_blast.tsv"
         )
         run_blastn_tncentral(
             fasta_path,
-            tncentral_db,
+            tncentral_fasta,
             blast_output,
             evalue=1e-5,
             num_threads=int(config["max_workers"]),

@@ -27,4 +27,4 @@ get_script_dir()
 }
 # --- END MATERIAL UNDER LICENSE: CC BY-SA 4.0 ---
 
-python "$(get_script_dir)/genome_profiler.py" "$@"
+python "$(get_script_dir)/genome_profiler/genome_profiler.py" "$@"

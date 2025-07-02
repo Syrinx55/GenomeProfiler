@@ -28,4 +28,4 @@ get_script_dir()
 # --- END MATERIAL UNDER LICENSE: CC BY-SA 4.0 ---
 
 cd "$(get_script_dir)"
-conda run -n genome-profiler python "$(get_script_dir)/genome_profiler.py" --gui
+conda run -n genome-profiler python "$(get_script_dir)/genome_profiler/genome_profiler.py" --gui
