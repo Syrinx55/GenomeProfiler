@@ -121,7 +121,7 @@ Examples:
     )
     parser.add_argument(
         "--env",
-        help="Path to file containing environment variables (default behavior: search recursively up directory tree for file named .env).",
+        help="Path to file containing environment variables (default behavior: search recursively up directory tree from working directory for file named .env).",
     )
     parser.add_argument(
         "--no-env",
