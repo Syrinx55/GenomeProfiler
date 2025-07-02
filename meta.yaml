@@ -1,4 +1,4 @@
-{% set version = "0.4.2rc12" %}
+{% set version = "0.4.2rc13" %}
 
 package:
   name: genome_profiler
