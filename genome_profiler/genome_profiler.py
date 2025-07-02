@@ -1,21 +1,15 @@
-try:
-    import argparse
-    from configparser import ConfigParser, SectionProxy
-    from dotenv import find_dotenv, load_dotenv
-    from multiprocessing import cpu_count
-    from .gui_frontend import main as gui_frontend_main
-    from . import install_resources
-    import subprocess
-    import sys
-    from typing import Union
-    from .collection_pipeline import process_accession
-    from .data_parser import run_parser
-    from pathlib import Path
-except ModuleNotFoundError as e:
-    e.add_note(
-        "\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler"
-    )
-    raise e
+import argparse
+from configparser import ConfigParser, SectionProxy
+from dotenv import find_dotenv, load_dotenv
+from multiprocessing import cpu_count
+from .gui_frontend import main as gui_frontend_main
+from . import install_resources
+import subprocess
+import sys
+from typing import Union
+from .collection_pipeline import process_accession
+from .data_parser import run_parser
+from pathlib import Path
 
 
 AVAILABLE_TOOLS = {
@@ -127,7 +121,7 @@ Examples:
     )
     parser.add_argument(
         "--env",
-        help="Path to file containing environment variables (default behavior: search recursively up directory tree for file named .env).",
+        help="Path to file containing environment variables (default behavior: search recursively up directory tree from working directory for file named .env).",
     )
     parser.add_argument(
         "--no-env",
@@ -261,7 +255,7 @@ def _validate_tools(config: SectionProxy):
 
     if missing:
         raise EnvironmentError(
-            f"Missing tools: {', '.join(missing)}\n\n(Try running:)\n  conda env update --prune\n  conda activate genome-profiler"
+            f"Missing tools: {', '.join(missing)}"
         )
 
 
