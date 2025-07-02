@@ -122,8 +122,6 @@ By default, GenomeProfiler will save its output within the current directory.
 
 This repository adheres to Semantic Versioning 2.0.0: <https://semver.org/>.
 
-The current version of this repository is stated in `./VERSION.txt`.
-
 ## Acknowledgements
 
 - Benjamin Alford ([Ssolar5](https://github.com/ssolar5)): Packaging for distribution, command-line interface, documentation, cleanup.
