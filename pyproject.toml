@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-genome_profiler = "genome_profiler:main"
+genome_profiler = "genome_profiler.genome_profiler:main"
 
 [tool.setuptools]
 include-package-data = true
