@@ -10,4 +10,3 @@ pycurl
 datetime
 dotenv
 requests_toolbelt
-data_parser

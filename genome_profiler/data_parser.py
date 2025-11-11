@@ -275,7 +275,7 @@ def main():
         print("[ERROR] No accession provided. Parsing cannot proceed.")
         return
 
-    run_parser(args.accession, args.config)
+    run_parser(args.accession)
 
 
 if __name__ == "__main__":

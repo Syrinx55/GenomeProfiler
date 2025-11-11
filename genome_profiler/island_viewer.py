@@ -1,5 +1,6 @@
 # Copyright (c) 2025 Jacob Alford <jalford0000@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
+# pylint: disable=undefined-variable
 
 import os
 import requests

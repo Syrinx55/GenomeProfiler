@@ -186,7 +186,7 @@ def main():
             output_override=acc_out,
         )
         if "parser" in (args.include_tools or []):
-            from data_parser import run_parser
+            from .data_parser import run_parser
 
             run_parser(Path(acc_out))
         return
