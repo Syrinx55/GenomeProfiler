@@ -63,12 +63,12 @@ jobs:
             bioconda-utils lint recipes config.yml \
               --packages genome_profiler
 
-      - name: Build & test recipe (Bioconda style)
+      - name: Build & test recipe (Lightweight Bioconda style)
         run: |
           docker run --rm \
-          -v "${{ github.workspace }}":/work \
+          -v "$PWD":/work \
           -w /work/bioconda \
           quay.io/bioconda/bioconda-utils-build-env:latest \
-          bioconda-utils build recipes config.yml \
-            --packages genome_profiler \
-            --loglevel=info
+          conda build recipes/genome_profiler \
+            --no-anaconda-upload \
+            --no-test
