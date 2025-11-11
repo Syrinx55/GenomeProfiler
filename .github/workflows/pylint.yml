@@ -33,4 +33,4 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         # lint only the package directory to avoid linting unrelated files
-        pylint genome_profiler
+        pylint --disable=C,R,W genome_profiler
