@@ -66,12 +66,9 @@ jobs:
       - name: Build & test recipe (Bioconda style)
         run: |
           docker run --rm \
-            -v "${{ github.workspace }}":/work \
-            -w /work/bioconda \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            quay.io/bioconda/bioconda-utils-build-env:latest \
-            bioconda-utils build recipes config.yml \
-              --packages genome_profiler \
-              --docker \
-              --mulled-test \
-              --loglevel=info
+          -v "${{ github.workspace }}":/work \
+          -w /work/bioconda \
+          quay.io/bioconda/bioconda-utils-build-env:latest \
+          bioconda-utils build recipes config.yml \
+            --packages genome_profiler \
+            --loglevel=info
