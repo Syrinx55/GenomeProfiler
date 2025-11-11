@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: "0 0 * * 0"
+
+jobs:
+  lint:
+    name: Pylint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies (for pycurl, optional)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcurl4-openssl-dev libssl-dev libxml2-dev libxslt1-dev
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          # pip install -e .
+
+      - name: Analysing the code with pylint
+        run: |
+          pylint --disable=C,R,W genome_profiler
+
+  bioconda:
+    name: Bioconda Recipe Test
+    needs: lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Show bioconda-utils version
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/work \
+            -w /work/bioconda \
+            quay.io/bioconda/bioconda-utils-build-env:latest \
+            bioconda-utils --version
+
+      - name: Lint recipe (Bioconda style)
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/work \
+            -w /work/bioconda \
+            quay.io/bioconda/bioconda-utils-build-env:latest \
+            bioconda-utils lint recipes config.yml \
+              --packages genome_profiler
+
+      - name: Build & test recipe (Lightweight Bioconda style)
+        run: |
+          docker run --rm \
+          -v "$PWD":/work \
+          -w /work/bioconda \
+          quay.io/bioconda/bioconda-utils-build-env:latest \
+          conda build recipes/genome_profiler \
+            --no-anaconda-upload \
+            --no-test
