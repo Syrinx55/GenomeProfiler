@@ -1,0 +1,37 @@
+name: Bioconda Recipe Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  bioconda:
+    name: Bioconda Recipe Test
+    needs: lint
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/bioconda/bioconda-utils-build-env:latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Show bioconda-utils version
+        run: bioconda-utils --version
+
+      - name: Lint recipe (Bioconda style)
+        working-directory: bioconda
+        run: |
+          bioconda-utils lint recipes config.yml \
+            --packages genome_profiler
+
+      - name: Build & test recipe (Bioconda style)
+        working-directory: bioconda
+        run: |
+          bioconda-utils build recipes config.yml \
+            --packages genome_profiler \
+            --docker \
+            --mulled-test \
+            --loglevel=info
