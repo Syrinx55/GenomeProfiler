@@ -2,7 +2,6 @@
 .env
 __pycache__
 *.log
-
 data_GenomeProfiler
 output_GenomeProfiler
 .Rhistory
